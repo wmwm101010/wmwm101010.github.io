@@ -1,0 +1,366 @@
+---
+title: 'Multifactor authentication setup with spring security'
+description: 'Creating multifactor authentication with spring security'
+date: '2024/2/22'
+---
+
+# Introduction
+
+This project demonstrates an implementation of Multi-Factor Authentication (MFA) for a backend API with Spring Security.
+
+I've worked with spring framework in the past but I've never really delved into spring security. The auto-configuration by spring boot makes it easy to get started as I found out, you will need to have some understanding of how it works under the hood to customize it to do what you want.
+
+# Spring security sample
+
+Spring provides a sample application that demonstrates how to implement MFA but it uses the default form login provided by spring boot. So it would not be appropriate if you using it for a backend API.
+
+The sample is also minimal and does not enforce strict authentication flow and you can skips auth steps to get to the protected content.
+
+# Goal
+
+So with the above in mind, I set out some key features that I want to implement
+
+1. JSON based interactions with the backend API
+2. Strict MFA flow (no skipping of steps)
+3. Limit the number of attempts for each step (start over if limit is reached)
+4. Try to keep the authentication logic in one place
+5. Use session-based authentication (no JWT because if you are going to use MFA,
+   you most likely need to invalidate sessions and manage them strictly)
+
+The authentication flow looks like this
+
+1. User logs in with username and password `/login`
+2. User submits time based auth token `/totp`
+3. User submits OTP code `/otp`
+4. User is authenticated and can access protected content at `/`
+
+# Terminology
+
+So spring security has the following classes/interfaces that are important
+
+`AuthenticationManager` - An interface that authenticates the user
+
+`ProviderManager` - An implementation of `AuthenticationManager` and it delegates the authentication to a list of `AuthenticationProvider` instances
+
+`AuthenticationProvider` - An interface that authenticates an `Authentication` request and is supposed to specify what kind of `Authentication` it supports
+
+`Authentication` - An interface that represents an authentication request or an authenticated user once it is processed by the `AuthenticationManager`
+
+`DaoAuthenticationProvider` - A built in implementation of `AuthenticationProvider` that authenticates users from a `UserDetailsService` and a `UsernamePasswordAuthenticationToken`.
+
+`UserDetailsService` - An interface that allows you to specify the logic for loading a user.
+
+Spring security Filters - Intercepts requests and to do security related things like authentication, authorization, etc.
+
+`AbstractAuthenticationProcessingFilter` - An abstract class used to implement authentication filters. It has built in logic to handle auth outcome and session management.
+
+`SecurityContext` - The class that holds the `Authentication` object of the currently authenticated user.
+
+`HttpSessionSecurityContextRepository` - An implementation of `SecurityContextRepository` and it persists the `SecurityContext` in the `HttpSession`, making the `SecurityContext` available across requests.
+
+# Implementation
+
+I felt that the best way to keep the auth logic in one place is to implement a custom `AuthenticationProvider`. It would authenticate custom `Authentication` instances to complete the authentication flow.
+
+## Authentication hierarchy
+
+To support the proposed custom `AuthenticationProvider`. I've implemented an `Authentication` object, called `MfaToken`, which is a subclassed by `UsernamePasswordMfaToken`, `TotpMfaToken` and `OtpMfaToken`.
+
+`MfaToken` represents the `Authentication` class that my custom `AuthenticationProvider` will support.
+
+```java
+public abstract class MfaToken extends AbstractAuthenticationToken {
+
+    private boolean isStageAuthenticated;
+
+    public MfaToken(boolean isStageAuthenticated) {
+        super(null);
+        this.isStageAuthenticated = isStageAuthenticated;
+    }
+
+    public boolean isStageAuthenticated() {
+        return isStageAuthenticated;
+    }
+}
+```
+
+> Note: `AbstractAuthenticationToken` is an implementation of `Authentication`
+
+The subclassed `MfaToken` objects are used to represent the different steps in the MFA flow and they contain the necessary information to authenticate the user.
+
+```java
+public class UsernamePasswordMfaToken extends MfaToken {
+
+    private Object principal;
+
+    private Object credentials;
+
+    public UsernamePasswordMfaToken(Object username, Object password) {
+        super(false);
+        this.principal = username;
+        this.credentials = password;
+    }
+
+    public UsernamePasswordMfaToken(Object principal, boolean isAuthenticated) {
+        super(true);
+        super.setAuthenticated(isAuthenticated);
+        this.principal = principal;
+
+    }
+
+    @Override
+    public Object getCredentials() {
+        return this.credentials;
+    }
+
+    @Override
+    public Object getPrincipal() {
+        return principal;
+    }
+   // ...
+
+}
+```
+
+## Filters
+
+To trigger the authentication, I would need to create custom `AbstractAuthenticationProcessingFilter` filters that will run on the necessary routes. Then, I would create the appropriate `Authentication` instances and pass them to the `AuthenticationManager` for authentication.
+
+I've created `UsernamePasswordMfaFilter`, `OotpMfaFilter`, `OtpMfaFilter` classes that extends the `AbstractAuthenticationProcessingFilter` abstract class.
+
+```java
+public class UsernamePasswordMfaFilter extends AbstractAuthenticationProcessingFilter {
+
+    private static final RequestMatcher DEFAULT_REQUEST_MATCHER = new AntPathRequestMatcher("/login",
+            HttpMethod.POST.name());
+
+    public UsernamePasswordMfaFilter() {
+        super(DEFAULT_REQUEST_MATCHER);
+    }
+
+    @Override
+    public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response)
+            throws AuthenticationException, IOException, ServletException {
+        try {
+            LoginRequest loginDto = JsonUtil.deserialize(request.getInputStream(), LoginRequest.class);
+            UsernamePasswordMfaToken authRequest = new UsernamePasswordMfaToken(loginDto.getUsername(),
+                    loginDto.getPassword());
+            Authentication authentication = this.getAuthenticationManager().authenticate(authRequest);
+            return authentication;
+        }
+        catch (StreamReadException | DatabindException e) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            throw new AuthenticationServiceException("Unable to parse JSON", e);
+        }
+    }
+}
+```
+
+<center>
+  <i>Example filter</i>
+</center>
+
+The reason for using `AbstractAuthenticationProcessingFilter` is that it has built in logic to persist authentication through the `SecurityContextRepository` and it also handles session related things.
+
+For persisting the authentication across requests I used the `HttpSessionSecurityContextRepository` which stores the `SecurityContext` in the `HttpSession`.
+
+```java
+UsernamePasswordMfaFilter authFilter = new UsernamePasswordMfaFilter();
+authFilter.setAuthenticationManager(authenticationManager);
+authFilter.setSecurityContextRepository(securityContextRepository());
+authFilter.setSessionAuthenticationStrategy(new ChangeSessionIdAuthenticationStrategy());
+authFilter.setAuthenticationSuccessHandler((req, res, auth) -> {
+    res.setStatus(HttpStatus.OK.value());
+});
+authFilter.setAuthenticationFailureHandler((req, res, auth) -> {
+    res.setStatus(HttpStatus.FORBIDDEN.value());
+});
+```
+<center>
+  <i>Example configuration</i>
+</center>
+
+As for session related things, I used the built in `ChangeSessionIdAuthenticationStrategy` to make sure session ids will change to prevent session fixation attacks.
+
+## AuthenticationProvider
+
+Once the `Authentication` object is created any of the above filters, it is passed to the `AuthenticationManager` for authentication. I've configured the `AuthenticationManager` as a `ProviderManager` which delegates the authentication to a list of `AuthenticationProvider` instances.
+
+```java
+@Bean
+public AuthenticationManager authenticationManager(UserDetailsService userDetailsService,
+        PasswordEncoder passwordEncoder, MfaService mfaService, BytesEncryptor bytesEncryptor) {
+    DaoAuthenticationProvider daoAuthenticationProvider = new DaoAuthenticationProvider();
+    daoAuthenticationProvider.setUserDetailsService(userDetailsService);
+    daoAuthenticationProvider.setPasswordEncoder(passwordEncoder);
+    MfaProvider multiFactorAuthenticationProvider = new MfaProvider(daoAuthenticationProvider, mfaService,
+            bytesEncryptor);
+    return new ProviderManager(daoAuthenticationProvider, multiFactorAuthenticationProvider);
+}
+```
+
+For the MFA, I created the `MfaProvider` to contain the logic for the authentication process. It will check if the user is following the correct flow and return the appropriate `Authentication` object. Here is an example for the last auth factor. Note that it checks if the previous auth factor is valid and the user is following the correct auth flow.
+
+```java
+private Authentication authenticateMfaToken(OtpMfaToken authentication) {
+    Authentication prevAuthentication = SecurityContextHolder.getContext().getAuthentication();
+
+    MfaToken prevMfaToken = (MfaToken) prevAuthentication;
+    checkForValidAuthStage(prevMfaToken, TotpMfaToken.class);
+    checkIfPreviousAuthIsValid(prevMfaToken);
+
+    if (!this.mfaService.checkOtp((CustomUser) prevMfaToken.getPrincipal(),
+            (String) authentication.getCredentials())) {
+        throw new BadCredentialsException("MultiFactorAuthenticationProvider.badcredentials");
+    }
+
+    return new OtpMfaToken(prevAuthentication.getPrincipal(), true);
+}
+```
+
+<center>
+  <i>Example auth procedure for the last auth factor</i>
+</center>
+
+> Note: `MfaProvider` only returns an `Authentication` object with the `isAuthenticated` flag set to true when it has decided that the user has completed the MFA process. Once the flag is set to true, the user has access to protected content. So for intermediate stages, it will be set to false.
+
+For initial username and password authentication within the `MfaProvider`, I reused the `DaoAuthenticationProvider` to authenticate the user as I did not want to reinvent the wheel. It already has security protections like timing attack mitigation and ability to retrieve the user details from a `UserDetailsService`.
+
+```java
+private Authentication authenticateMfaToken(UsernamePasswordMfaToken authentication) {
+    Authentication auth = daoAuthenticationProvider.authenticate(new UsernamePasswordAuthenticationToken(
+            authentication.getPrincipal(), authentication.getCredentials()));
+
+    if (!auth.isAuthenticated()) {
+        throw new BadCredentialsException("MultiFactorAuthenticationProvider.badcredentials");
+    }
+
+    return new UsernamePasswordMfaToken(auth.getPrincipal(), false);
+}
+```
+
+
+## Success and failure handlers
+
+We are able to set success and failure handlers for the `AbstractAuthenticationProcessingFilter`s that we have created earlier.
+
+I've used it to track the number of attempts at each stage by saving an attribute to the `HttpSession`.
+
+```java
+public class RestrictMfaAttemptsHandler implements AuthenticationSuccessHandler, AuthenticationFailureHandler {
+
+    private final SecurityContextRepository securityContextRepository = new HttpSessionSecurityContextRepository();
+
+    private int maxAttempts;
+
+    public RestrictMfaAttemptsHandler(int maxAttempts) {
+        this.maxAttempts = maxAttempts;
+    }
+
+    @Override
+    public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
+            AuthenticationException exception) throws IOException, ServletException {
+
+        Integer attempts = (Integer) request.getSession().getAttribute("MFA_STAGE_ATTEMPTS");
+        attempts = attempts == null ? 1 : attempts + 1;
+        if (attempts > maxAttempts) {
+            clearAuthentication(request, response);
+            response.setStatus(HttpStatus.FORBIDDEN.value());
+
+        }
+        else {
+            request.getSession().setAttribute("MFA_STAGE_ATTEMPTS", attempts);
+            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+        }
+
+    }
+
+    @Override
+    public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
+            Authentication authentication) throws IOException, ServletException {
+        request.getSession().setAttribute("MFA_STAGE_ATTEMPTS", 0);
+    }
+
+    private void clearAuthentication(HttpServletRequest request, HttpServletResponse response)
+            throws IOException, ServletException {
+        SecurityContext context = SecurityContextHolder.getContext();
+        context.setAuthentication(null);
+        this.securityContextRepository.saveContext(context, request, response);
+    }
+}
+```
+
+> Note: To reset the authentication process, we need to clear the
+> `SecurityContext` and save it to the `SecurityContextRepository`. This removes the current `Authentication` from the session.
+
+Another success handler is also used to trigger OTP generation after the user has completed the TOTP stage.
+
+```java
+@Override
+public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
+        Authentication authentication) throws IOException, ServletException {
+    if (authentication.getPrincipal().getClass().isAssignableFrom(CustomUser.class))
+        mfaService.generateOtp((CustomUser) authentication.getPrincipal());
+}
+```
+
+## Testing
+
+For testing, I used the did a full integration test with `RestTemplate` and `@SpringBootTest`. It is particularly useful as I can fiddle with the configuration and I do not need to manually verify the flow in PostMan.
+
+```java
+@Test
+public void multiFactorLogin_Success_canObtainProtectedContent() throws Exception {
+    // Login
+    ResponseEntity<Void> loginResponse = login("user", "password");
+    assertEquals(HttpStatus.OK, loginResponse.getStatusCode());
+
+    // Totp
+    String totpToken = TimeBasedOneTimePasswordUtil.generateCurrentNumberString(TOTP_BASE32_KEY);
+    ResponseEntity<Void> totpResponse = totp(totpToken);
+    assertEquals(HttpStatus.OK, totpResponse.getStatusCode());
+
+    // Otp
+    ResponseEntity<Void> otpResponse = otp(OTP_TOKEN);
+    assertEquals(HttpStatus.OK, otpResponse.getStatusCode());
+
+    // Protected content
+    ResponseEntity<ProtectedContentResponse> response = getProtectedContent();
+    assertEquals(HttpStatus.OK, response.getStatusCode());
+    assertEquals(response.getBody().getUsername(), "user");
+    assertEquals(response.getBody().getContent(), "content");
+
+    // Cannot access multifactor auth routes
+    totpToken = TimeBasedOneTimePasswordUtil.generateCurrentNumberString(TOTP_BASE32_KEY);
+    totpResponse = totp(totpToken);
+    assertEquals(HttpStatus.UNAUTHORIZED, totpResponse.getStatusCode());
+
+    otpResponse = otp(OTP_TOKEN);
+    assertEquals(HttpStatus.UNAUTHORIZED, otpResponse.getStatusCode());
+}
+```
+
+<center>
+  <i>Example test</i>
+</center>
+
+# Further secure the application
+
+For simplicity, I left out some configurations. Here are some additional steps to further secure the application.
+
+1.  Configure HTTP cookies with the secure, same-site and http-only flags
+2.  Currently CSRF protection is disabled as I am not using the default form login. Cookies with the same-site configuration can be used to mitigate CSRF attacks but it is dependent on browser support. But you can still do a mechanism [like this](https://typeofnan.dev/using-cookie-based-csrf-tokens-for-your-single-page-application/) to protect against CSRF attacks
+
+# Challenges
+
+As someone completely new to spring security, learning it can be challenging as there can be many outdated tutorials online. Especially those that are still using the deprecated `WebSecurityConfigurerAdapter` for configuration.
+
+The official documentation is a good starting point but to go beyond the standard configurations, I still needed to refer to the source code and understand how things work.
+
+# Conclusion
+
+Through this simple project, I've managed to practice and familiarize myself with spring security concepts but do let me know if I've missed anything.
+
+# Code
+
+Source code can be found [here](https://github.com/wmwm101010/springboot-mfa-example)

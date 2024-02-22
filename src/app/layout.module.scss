@@ -1,0 +1,31 @@
+$website-width: 80ch;
+
+.header,
+.container,
+.footer {
+  max-width: $website-width;
+  width: 100%;
+  min-width: 200px;
+  margin: auto;
+  padding: 0 1rem;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+}
+
+@media screen and (min-width: 600px) {
+  /* Styles for screens wider than 600px */
+  .container {
+    margin: auto;
+  }
+}
+
+@media screen and (max-width: 599px) {
+  /* Styles for screens narrower than 600px */
+
+  .container {
+    margin: auto;
+  }
+}

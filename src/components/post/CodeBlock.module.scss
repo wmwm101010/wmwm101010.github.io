@@ -1,0 +1,26 @@
+.code-block {
+  background-color: var(--secondary-surface-color);
+  border-radius: 5px;
+  overflow: auto;
+  padding: 0 1rem 0 1rem;
+  > * {
+    font-size: 0.8rem;
+  }
+}
+
+.code-block::-webkit-scrollbar-track {
+  background-color: var(--secondary-surface-color);
+  border-radius: 0 0 5px 5px;
+}
+
+.code-block::-webkit-scrollbar {
+  height: 6px;
+  width: 5px;
+  background-color: var(--primary-surface-color);
+  border-radius: 0 0 5px 5px;
+}
+
+.code-block::-webkit-scrollbar-thumb {
+  border-radius: 5px;
+  background-color: var(--primary-surface-color);
+}

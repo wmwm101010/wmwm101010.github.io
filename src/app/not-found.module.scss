@@ -1,0 +1,23 @@
+.error-dialog {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 20vh;
+  gap: 1rem;
+
+  .error-code {
+    font-size: 3rem;
+    font-weight: bolder;
+  }
+
+  .error-message {
+    font-size: 1rem;
+    font-weight: bolder;
+  }
+
+  a {
+    text-decoration: none;
+    color: var(--primary-color);
+    font-weight: bolder;
+  }
+}

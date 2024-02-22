@@ -1,0 +1,69 @@
+@use 'sass:meta';
+
+// Reset or Normalize Styles
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Themes */
+:root {
+  --gray0: #ffffff;
+  --gray1: #f4f4f4;
+  --gray2: #ededed;
+  --gray3: #e5e5e5;
+  --gray4: #434953;
+  --gray5: #2a2e35;
+  --gray6: #3a3f47;
+  --gray7: #1c2022;
+  --red: #ef5151;
+}
+
+.light {
+  --bg-color: var(--gray1);
+  --primary-surface-color: var(--gray2);
+  --secondary-surface-color: var(--gray3);
+  --accent-color: var(--gray3);
+  --text-color: var(--gray7);
+  --border-color: var(--blue);
+}
+
+.dark {
+  --bg-color: var(--gray5);
+  --primary-surface-color: var(--gray4);
+  --secondary-surface-color: var(--gray7);
+  --accent-color: var(--gray0);
+  --text-color: var(--gray0);
+  --border-color: var(--purple);
+}
+
+html {
+  font-family: sans-serif;
+  overflow-y: scroll;
+  scroll-behavior: smooth;
+  min-width: 320px;
+  font-size: 17px;
+
+  @media only screen and (min-width: 600px) {
+    font-size: 19px;
+  }
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  margin: 0;
+}
+
+/* highlight js */
+
+body[class='dark'] {
+  @include meta.load-css('./highlight-js/github-dark-dimmed.css');
+}
+
+body[class='light'] {
+  @include meta.load-css('./highlight-js/github.css');
+}

@@ -1,0 +1,35 @@
+.project-posts {
+  margin: 1rem 0 1rem 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 1rem;
+}
+
+.project-posts-full-width {
+  grid-template-columns: 1fr;
+}
+
+.project-post {
+  a {
+    padding: 1rem;
+    background-color: var(--primary-surface-color);
+    min-width: 15rem;
+    height: 100%;
+    color: inherit;
+    display: block;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+  }
+  p,
+  h3 {
+    margin: 1rem;
+  }
+}
+
+.no-posts-message {
+  width: 100%;
+  padding: 2rem 0 2rem 0;
+  p {
+    text-align: center;
+  }
+}

@@ -1,0 +1,58 @@
+@import '../../styles/mixins/post.scss';
+
+.post-content {
+  > * {
+    margin-bottom: 2rem;
+  }
+
+  // Headings
+  @include headings {
+    scroll-margin-top: 64px; // offset for fixed header
+    line-height: 1.5;
+    margin-bottom: 0.5rem;
+  }
+
+  // paragraphs
+  p {
+    line-height: 1.5;
+  }
+
+  // Links
+  a {
+    text-decoration: underline 2px;
+    text-underline-position: under;
+    text-decoration-color: --var(accent-color);
+  }
+
+  // Block quotes
+  blockquote {
+    margin-left: 0;
+    border-left: 5px solid var(--primary-surface-color);
+    padding: 1rem;
+    > * {
+      margin-left: 1rem;
+      font-style: italic;
+    }
+  }
+
+  // Inline pre tags
+  @include inline-code {
+    font-family: monospace, monospace;
+    background-color: var(--primary-surface-color);
+    border-radius: 2px;
+    overflow-wrap: break-word;
+    padding: 0 5px 0 5px;
+    hyphens: auto;
+  }
+
+  // lists
+  ol,
+  ul {
+    li {
+      padding-left: 1em;
+    }
+    li:not(:first-child) {
+      padding-top: 1em;
+    }
+  }
+}
