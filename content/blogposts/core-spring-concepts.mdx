@@ -1,0 +1,550 @@
+---
+title: 'Core Spring concepts'
+author: 'WM'
+date: '2024-3-4'
+showTableOfContents: true
+---
+
+# Introduction
+Here are some of my notes on core Spring concepts that I've accumulated so far. It is not meant to be comprehensive but rather more of a "cheat sheet" for me to refer to when I need to refresh my memory on Spring concepts.
+
+
+# Core concepts
+Spring has the following main core concepts:
+
+1. Dependency injection
+2. Beans
+2. Inversion of control (IoC)
+3. Aspect Oriented Programming (AOP)
+
+# Dependency injection
+>  Dependency injection is a programming technique in which an object or function receives other objects or functions that it requires, as opposed to creating them internally
+>
+> Source: [Wikipedia](https://en.wikipedia.org/wiki/Dependency_injection)
+
+```java
+// non-dependency injection
+public class Car {
+    private Engine engine;
+    public Car() {
+        this.engine = new Engine();
+    }
+}
+
+// Dependency injection
+public class Car {
+    private Engine engine;
+    public Car(Engine engine) {
+        this.engine = engine;
+    }
+}
+
+```
+## Spring dependency injection
+In short, Spring helps you to create and wire up objects in java. 
+
+Why should I let spring do it for me?
+- Reduced coupling: because the object does not create its own dependencies, it is not tightly coupled to them
+- Better readability: classes solely focus on what they are supposed to do with their injected dependencies
+- Better testability: Easier to mock dependencies for testing 
+
+Spring provides 3 ways to inject dependencies into a class.
+1. Constructor injection
+2. Field injection
+3. Setter injection
+
+*Note: When there are 2 or more applicable beans, use `@Qualifier` annotation to deconflict or only define one bean of the same type*
+
+**Sanity check**: If you doing `new SomeObject()` in your classes (note: not in `@Bean` declaration), you most probably not using spring and are managing the dependencies yourself.
+
+### Constructor injection
+```java
+@Component
+public class ExampleController {
+    private ExampleDependency dependency;
+
+    @Autowired
+    public ExampleController (ExampleDependency dependency){
+        this.dependency= dependency;
+    }
+}
+```
+
+Pros
+- Enforce mandatory dependencies
+- Object always have a valid dependency
+- Dependency can be declared `final` to enforce immutability
+- Easy to mock dependencies for testing
+
+Cons
+- Can get messy if there are many dependencies 
+    - Alternatively use `@RequiredArgsConstructor`/`@AllArgsConstructor` from Lombok but take note of the usage of each annotation [here](https://projectlombok.org/features/constructor)
+    - Note that if you have many dependencies, it might be a sign that the class is not following single responsibility principle.
+
+    
+### Setter injection 
+```java
+@Component
+public class ExampleController {
+    private ExampleDependency dependency;
+
+    @Autowired
+    public void setDependency(ExampleDependency dependency){
+        this.dependency= dependency;
+    }
+}
+```
+
+Pros 
+- Enable optional dependencies
+- Allows runtime changes of dependencies
+
+Cons
+- Initialization order is not guaranteed
+
+
+    
+### Field injection    
+```java
+@Component
+public class ExampleController {
+
+    @Autowired
+    private ExampleDependency dependency;
+}
+```
+
+Pros 
+- Enable optional dependencies
+- Short and concise
+
+Cons
+- Hard to mock dependencies for testing
+- Test code is coupled with spring
+- Initialization order is not guaranteed
+
+
+## Best practice
+1. Prefer Constructor Injection
+2. Autowire fields by their interface type (if it makes sense) 
+
+# Beans
+A bean is an object that is instantiated, assembled, and otherwise managed by a Spring IoC container.
+
+In short, injected classes or classes using DI has to be a spring bean.
+
+
+## Properties
+Each bean has the following properties
+
+1. Name (identifier of the bean in the application context)
+    - Automatically generated if not specified
+2. Scope
+3. Constructor arguments: dependencies required by the bean
+4. Properties
+5. Autowiring mode (By name, by type)
+6. Lazy-initialization mode
+7. Initialization method (refer to methods marked with `@PostConstruct` in the bean, or `afterPropertiesSet()` in `InitializingBean` interface)
+    - Called after the bean has been created and all dependencies are satisfied
+8. Destruction method (refer to methods marked with `@PreDestroy` in the bean)
+    - Called before the bean is removed from application context
+
+### Scope
+Controls when to create a new instance of a bean, and when to reuse an existing instance.
+
+1. **Singleton (Default)**: Only one instance of the bean is created and shared across the application
+2. **Prototype**: A new instance of the bean is created each time it is requested
+3. **request**: A new instance of the bean is created for each HTTP request 
+4. **session**: A new instance of the bean is created for each HTTP session
+5. **application**: A new instance of the bean is created for each ServletContext   
+6. **websocket**: A new instance of the bean is created for each WebSocket
+
+[How to use each scope](https://www.baeldung.com/spring-bean-scopes)
+
+### Autowiring modes
+1. By name
+2. By type
+    - If 2 or more beans of the same type are present, use @Qualifier to resolve ambiguity, or else a fatal exception is thrown
+
+```java
+public interface Animal {
+    void eat();
+}
+
+@Component("dogbean")
+public class Dog implements Animal {
+    @Override
+    public void eat() {
+        System.out.println("Dog eating");
+    }
+}
+
+@Component("catbean")
+public class Cat implements Animal {
+    @Override
+    public void eat() {
+        System.out.println("Cat eating");
+    }
+}
+
+@Component
+public class AnimalService {
+
+    private Dog dog;
+    private Cat cat;
+
+    @Autowired
+    public AnimalService(@Qualifier("dogbean") Dog dog, @Qualifier("catbean") Cat cat) {
+        this.car = car;
+    }
+
+    public void feedAnimals() {
+        dog.eat();
+        cat.eat();
+    }
+}
+```
+
+### Lazy-initialization mode
+Spring creates all singleton beans at startup by default. However, you can defer the initialization of a bean until it is first requested.
+
+This is accomplished using the `@Lazy` annotation in the following scenarios 
+1. Used with class with the `@Configuration` annotation (`@Configuration` indicates class is a source of bean definitions)
+    - Tells spring that all beans in the configuration class should be lazily initialized
+2. Used with `@Component` or `@Bean` annotations
+    - Tells spring that the bean should be lazily initialized
+
+[See here for more details](https://www.baeldung.com/spring-lazy-annotation)
+
+## Ways to instantiate beans
+
+1. XML configuration / factory methods
+2. Using `@Bean` annotation in a `@Configuration` class
+3. Using Stereotype Annotations (`@Component`, `@Service`, `@Repository`, `@Controller`)
+4. Using `@Import` to import configuration from other classes
+6. Extend `InitializingBean` and `DisposableBean` Interfaces
+7.  `@Conditional` for Conditional Bean Creation
+
+*Note: XML configuration is generally not recommended as it is not type safe.*
+
+### Using @Bean annotation
+```java
+// Bean definition
+public class TestBean {
+    private String message;
+
+    public TestBean(String message) {
+        this.message = message;
+    }
+
+    public void printMessage() {
+        System.out.println(message);
+    }
+}
+
+@Configuration
+public class AppConfig {
+
+    @Bean
+    public TestBean testBean() {
+        return new TestBean("Hello, Spring!");
+    }
+}
+
+
+@SpringBootApplication
+public class MainApp {
+    public static void main(String[] args) {
+        ApplicationContext context = SpringApplication.run(AppConfig.class, args);
+        TestBean testBean = context.getBean(TestBean.class);
+        testBean.printMessage();
+    }
+}
+```
+
+### Using Stereotype Annotations
+Spring offers some predefined annotations to help you define beans in your application. These annotations are used to indicate the role of the annotated class in the application.
+
+1. `@Component`: Indicates that class is bean and automatically detected by spring
+2. `@Service`: A specialization of `@Component` and is used to indicate that the class is a service.
+3. `@Repository`: A specialization of `@Component` and is used to indicate that the class is a repository.
+4. `@Controller`: A specialization of `@Component` and is used to indicate that the class is a controller.
+
+*Note: for `@Component` and its specializations, use `@ComponentScan` to specify the package to scan for components. You don't need `@ComponentScan` if you are using `@SpringBootApplication` because it is already included by the latter annotation. *
+
+These specializations are useful for aspect oriented programming (AOP), see [here for more details](https://docs.spring.io/spring-framework/reference/core/beans/classpath-scanning.html#beans-stereotype-annotations)
+
+### Importing bean definitions
+Use `@Import` when you want to import bean definitions from other configuration classes without using `@ComponentScan`
+
+```java
+@Configuration
+public class ConfigA {
+    @Bean
+    public BeanA beanA() {
+        return new BeanA(...);
+    }
+}
+
+@Configuration
+@Import(ConfigA.class) 
+public class ConfigB {
+    @Autowired 
+    private ConfigA configA;
+
+    @Bean
+    public BeanB beanB() {
+        return new BeanB(configA.beanA());
+    }
+}
+```
+
+### Extend InitializingBean and DisposableBean Interfaces
+
+Implement `InitializingBean` and `DisposableBean` interfaces on your classes to define beans with initialization and destruction methods.
+
+This is useful when you want to define initialization and destruction methods for your beans without using annotations.
+
+But note that this is not recommended as it couples your code with spring.
+
+```java
+public class MyBean implements InitializingBean, DisposableBean  {
+   @Override
+    public void afterPropertiesSet() throws Exception {
+        // Runs when bean is created and all dependencies injected
+        // Run initialization logic here
+    }
+    @Override
+    public void destroy() throws Exception {
+        // Runs when application context is closed
+        // Run cleanup logic here
+    }
+}
+```
+
+### Conditional bean creation
+To conditionally create beans you will have to implement `Condition` inteface and use it with the `@Conditional` annotation on the spring bean definition.
+
+```java
+public class CustomCondition implements Condition {
+    @Override
+    public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+        // Condition logic here
+        return true;
+    }
+}
+
+@Configuration
+@Conditional(CustomCondition.class)  // Only create beans in configuration if condition is met
+class Config {
+    // ...
+    @Bean
+    @Conditional(IsDevEnvCondition.class)   // Only create bean if condition is met
+    BeanA beanA() {
+        return new BeanA();
+    }
+}
+
+```
+
+Spring boot has some built in [conditions](https://docs.spring.io/spring-boot/docs/current/api/org/springframework/boot/autoconfigure/condition/package-summary.html) that you can use. (Eg. `@ConditionalOnBean`, `@ConditionalOnMissingBean`, `@ConditionalOnClass`, `@ConditionalOnProperty`,...)
+
+## Best practices
+1. Use Java Configuration (@Configuration) over XML configuration because its type safe and easier to refactor
+2. Modularize configurations to avoid having a single configuration class with many beans
+
+
+# Inversion of Control
+>  Inversion of Control (IoC) is a design pattern in which custom-written portions of a computer program receive the flow of control from a generic framework
+>
+> Source: [Wikipedia](https://en.wikipedia.org/wiki/Inversion_of_control)
+
+In terms of spring, it refers to how spring takes over the management of the bean lifecycle and dependencies.
+
+## Inversion of control container
+Inversion of Control container is responsible for instantiating, configuring, and assembling the beans. It is represented by the `ApplicationContext` in spring.
+
+For spring boot this done for us however you can still create your own `ApplicationContext` if you want to.
+
+## Ways of instantiating IoC container
+1. XML configuration
+2. Java configuration
+
+```java
+// Java configuration
+public class MainApp {
+    public static void main(String[] args) {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+        MyService myService = context.getBean(MyService.class);
+        myService.performService();
+        context.close();
+    }
+}
+
+// XML configuration
+public class MainApp {
+    public static void main(String[] args) {
+        ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("applicationContext.xml");
+        MyService myService = context.getBean("myService", MyService.class);
+        myService.performService();
+        context.close();
+    }
+}
+```
+
+# AOP (Aspect Oriented Programming)
+> Aspect-oriented programming (AOP) is a programming paradigm that aims to increase modularity by allowing the separation of cross-cutting concerns.  
+>
+> Source: [Wikipedia](https://en.wikipedia.org/wiki/Aspect-oriented_programming)
+
+In short, AOP allows you to remove cross-cutting concerns (Eg. logging, security, transaction management) from your classes and modularize them.
+
+This is how spring security enables features like `@PreAuthorize` and `@PostAuthorize`.
+
+## Terminology
+
+1. **Aspect**: A modularization of a concern that cuts across multiple classes
+2. **Join point**: A point during the execution of a program (Eg. execution of a method, handling of an exception,...)
+3. **Advice**: Action taken by an aspect at a particular join point. Timing of when the action can be taken is specified by sepcial annotations (Eg. `@Before`, `@After`,..)
+4. **Pointcut**: A predicate that matches join points. Determines which advice should be run at each join point. (Spring uses the AspectJ pointcut expression language by default)
+5. **AOP proxy**: A wrapper object created by the AOP framework, wrapping target objects, which enables the implementation of aspect contracts 
+
+[See official docs](https://docs.spring.io/spring-framework/reference/core/aop/introduction-defn.html)
+
+* Note: Spring allows you to use XML or @AspectJ annotation style *
+
+## Join point
+
+1. Method execution
+2. Method call
+3. Constructor execution
+4. Constructor call
+5. Field access
+6. Field modification
+7. Exception handling
+
+
+## Advice
+Declare advice by using `@Aspect` annotation on a class and then using the following annotations to specify the timing of the advice
+
+1. `@Before`: Run before the method execution
+2. `@After`: Run after the method execution
+3. `@AfterReturning`: Run after the method returns a value
+4. `@AfterThrowing`: Run after the method throws an exception
+5. `@Around`: Run before and after the method execution
+
+*Advice parameters can be used to access the join point and the target object.*
+
+## Pointcut designators
+Spring uses AspectJ pointcut expression language by default and only supports a subset of the full AspectJ pointcut expression language.
+
+Here are some common pointcuts used in spring
+1. `execution`: for matching method execution join points
+2. `@within`: for matching join points within certain types  
+...
+
+[See here for more details](https://docs.spring.io/spring-framework/reference/core/aop/ataspectj/pointcuts.html#aop-pointcuts-designators)
+
+
+## Example: logging aspect
+
+```java
+@Service
+public class DemoService {
+	public void doSomething() {
+		System.out.println("Inside DemoService - doSomething()");
+	}
+}
+
+@Controller
+public class DemoController {
+	@Loggable
+	public void doSomething() {
+		System.out.println("Inside DemoController - doSomething()");
+	}
+}
+
+@Service
+public class DemoService {
+	public void doSomething() {
+		System.out.println("Inside DemoService - doSomething()");
+	}
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+public @interface Loggable {
+}
+
+@Aspect
+@Component
+public class LoggingAspect {
+	@Pointcut("@annotation(com.aop.example.demo.aop.aspect.Loggable)") // Named pointcuts
+	public void loggableMethods() {
+	}
+
+	@Pointcut("@within(com.aop.example.demo.aop.aspect.Loggable)") // Named pointcuts
+	public void loggableClassMethods() {
+
+	}
+
+	@Pointcut("@within(org.springframework.stereotype.Service)") // Named pointcuts
+	public void serviceBeans() {
+	}
+
+	@Before("loggableClassMethods() || loggableMethods() ||serviceBeans()")
+	public void logBefore(JoinPoint joinPoint) {
+		String methodName = joinPoint.getSignature().getName();
+		String className = joinPoint.getSignature().getDeclaringType().getSimpleName();
+		System.out.println("Before " + className + " - " + methodName + "()");
+	}
+
+	// Short hand
+	@After("execution(* com.aop.example.demo.aop.controllers..*(..)) "
+			+ "|| execution(* com.aop.example.demo.aop.services..*(..)) "
+			+ "|| execution(* com.aop.example.demo.aop.repositories..*(..))")
+	public void logAfter(JoinPoint joinPoint) {
+		String methodName = joinPoint.getSignature().getName();
+		String className = joinPoint.getSignature().getDeclaringType().getSimpleName();
+		System.out.println("After " + className + " - " + methodName + "()");
+	}
+}
+
+@SpringBootApplication
+public class DemoAopApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(DemoAopApplication.class, args);
+	}
+
+	@Bean
+	public ApplicationRunner appRunner(
+        DemoController demoController, 
+        DemoService demoService, 
+        DemoRepository demoRepository) {
+		return args -> {
+			demoController.doSomething();
+			demoService.doSomething();
+			demoRepository.doSomething();
+		};
+	}
+}
+
+```
+
+Resulting output
+```
+Before DemoController - doSomething()
+Inside DemoController - doSomething()
+After DemoController - doSomething()
+Before DemoService - doSomething()
+Inside DemoService - doSomething()
+After DemoService - doSomething()
+Before DemoRepository - doSomething()
+Inside DemoRepository - doSomething()
+After DemoRepository - doSomething()
+```
+
+
+
+
