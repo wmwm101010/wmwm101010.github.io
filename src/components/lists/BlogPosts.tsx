@@ -7,19 +7,27 @@ import React, { useState } from 'react'
 import styles from './BlogPosts.module.scss'
 import Paginator from './Paginator'
 
-function LatestBlogPosts(props: {
+function LatestBlogPosts({
+  blogs,
+  numPerPage,
+  pagination,
+}: {
   blogs: BlogPost[]
   numPerPage: number
   pagination: boolean
 }) {
-  const [currentPage, setCurrentPage] = useState(1)
-
-  const filteredBlogs: BlogPost[] = props.blogs.slice(
-    (currentPage - 1) * props.numPerPage,
-    props.numPerPage * currentPage,
+  blogs = blogs.sort(
+    (a, b) => b.metadata.date.getTime() - a.metadata.date.getTime(),
   )
 
-  const maxPage = Math.max(1, Math.ceil(props.blogs.length / props.numPerPage))
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const filteredBlogs: BlogPost[] = blogs.slice(
+    (currentPage - 1) * numPerPage,
+    numPerPage * currentPage,
+  )
+
+  const maxPage = Math.max(1, Math.ceil(blogs.length / numPerPage))
 
   const onNextPage = () => setCurrentPage(page => Math.min(page + 1, maxPage))
   const onPrevPage = () => setCurrentPage(page => Math.max(page - 1, 1))
@@ -27,7 +35,7 @@ function LatestBlogPosts(props: {
   return (
     <>
       <div className={styles['blog-posts']}>
-        {props.blogs.length === 0 && (
+        {blogs.length === 0 && (
           <div>
             <p>🚧 Work in progress 🚧</p>
           </div>
@@ -42,7 +50,7 @@ function LatestBlogPosts(props: {
         ))}
       </div>
 
-      {props.pagination && (
+      {pagination && (
         <Paginator
           totalPages={maxPage}
           currentPage={currentPage}
