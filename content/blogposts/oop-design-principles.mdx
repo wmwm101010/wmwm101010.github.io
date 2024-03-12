@@ -1,0 +1,240 @@
+---
+title: 'OOP Design principles in java'
+author: 'WM'
+date: '2024-3-14'
+showTableOfContents: true
+---
+
+# Introduction
+Here is a summary of common OOP design principles and best practices in Java. 
+
+# SOLID principles
+1. Single Responsibility Principle
+2. Open/Closed Principle
+3. Liskov Substitution Principle
+4. Interface Segregation Principle
+5. Dependency Inversion Principle
+
+## Single Responsibility Principle
+
+A class should only have a single responsibility/purpose.
+
+> "A class should have only one reason to change"\
+> "Gather together the things that change for the same reasons"\
+> \
+> Robert C. Martin
+
+## Open/Closed Principle
+A module should be extendable without requiring modification. Adding new features should only require adding new code.
+
+> "Software entities (classes, modules, functions, etc.) should be open for extension, but closed for modification"\
+> \
+> Bertrand Meyer
+
+Common applicable situations 
+- Use **interfaces** to define the contract of a class so that new implementations be added (eg. PaymentMethods and its implementations)
+- Use **strategy pattern** for operations that may have varying implementations
+- Use **adapter pattern** to adapt to new requirements
+- Use **visitor pattern** to add new operations to existing classes without modifying them
+
+## Liskov Substitution Principle
+A subclass should not be more restrictive than the behaviour specified by the superclass. 
+
+> Subtypes must be substitutable for their base types.\
+> \
+> Robert C. Martin
+
+> Rules
+> 1. Method signature rules
+>    - **Argument**: Overridden subtype method argument types can be identical or wider than the supertype method argument types
+>    - **Return type**: overridden subtype method can be narrower than the return type of the supertype method
+>    - **Exceptions**: subtype method can throw fewer or narrower (but not any additional or broader) exceptions than the supertype method.
+> 2. Properties Rule 
+>    - **Class Invariants**: all subtype methods (inherited and new) must maintain or strengthen the supertype’s class invariants.
+>    - **History Constraint**: subclass methods (inherited or new) shouldn’t allow state changes that the base class didn’t allow.
+> 3. Methods Rule
+>    - **Preconditions**: A subtype can weaken (but not strengthen) the precondition for a method it overrides
+>    - **Postconditions**: A subtype can strengthen (but not weaken) the postcondition for a method it overrides
+>   
+> [Baeldung](https://www.baeldung.com/java-liskov-substitution-principle)
+
+```java
+// Does not satisfy LSP
+interface Bird {
+    public void fly();
+}
+
+class Penguin extends Bird {
+    @Override
+    public void fly() {
+        throw new UnsupportedOperationException("Penguins can't fly!");
+    }
+}
+
+// LSP
+interface Bird {
+    public void eat();
+}
+
+interface FlyingBird extends Bird {
+    public void fly();
+}
+
+class Penguin extends FlyingBird {
+    @Override
+    public void eat() {
+        // eat
+    }
+    @Override
+    public void fly() {
+        throw new UnsupportedOperationException("Penguins can't fly!");
+    }
+}
+```
+Common applicable situations 
+- When designing class hierarchies
+- Overriding methods
+- Implementing interfaces
+- Refactoring/extending existing code
+
+## Interface Segregation Principle
+The interface should be specific rather than general-purpose. 
+
+Prevents "fat" interfaces.
+
+> "Clients should not be forced to depend upon interfaces that they do not use"
+> \
+> Robert C. Martin
+
+```java
+// Violates ISP
+interface MultiFunctionDevice {
+    void print(Document d);
+    void scan(Document d);
+}
+
+class SimplePrinter implements MultiFunctionDevice {
+    @Override
+    public void print(Document d) {
+        System.out.println("Printing document.");
+    }
+
+    @Override
+    public void scan(Document d) {
+        throw new UnsupportedOperationException("Scan function is not supported.");
+    }
+}
+// ISP
+interface Printer {
+     void print(Document d);
+}
+
+interface Scanner {
+    void scan(Document d);
+}
+
+class SimplePrinter implements Printer {
+    @Override
+    public void print(Document d) {
+        System.out.println("Printing document.");
+    }
+}
+
+class PhotoCopier implements Printer, Scanner {
+    @Override
+    public void print(Document d) {
+        System.out.println("Printing document.");
+    }
+    @Override
+    public void scan(Document d) {
+        System.out.println("Scanning document.");
+    }
+}
+```
+
+
+## Dependency Inversion Principle
+1. High-level modules should not depend on low-level modules. Both should depend on abstractions.
+2. Abstractions should not depend on details. Details should depend on abstractions.
+
+```java
+// DIP 
+// 1. ReportGenerator and DatabaseDataSource dependend on abstraction DataSource
+// 2. DataSource does not depend on fetchData() details
+interface DataSource {
+    Data fetchData();
+}
+
+class DatabaseDataSource implements DataSource {
+    public Data fetchData() {
+        // Implementation details for fetching data from a database
+    }
+}
+
+class ReportGenerator {
+    private DataSource dataSource;
+
+    public ReportGenerator(DataSource dataSource) {
+        this.dataSource = dataSource;
+    }
+
+    public void generateReport() {
+        Data data = dataSource.fetchData();
+        // Use the data to generate the report
+    }
+}
+```
+# DRY
+Dont repeat yourself
+
+Reduce repetition by replacing it with abstractions
+
+Common methods
+- Extracting repeated lines into methods
+- Using constants for repeated values
+- Abstracting Common Functionality with Interfaces or Abstract Classes
+
+# KISS 
+Keep it simple
+
+1. Simple and descriptive naming
+2. Short and focused functions with a single purpose
+3. Avoid premature optimizations
+4. Use simple solutions that work before using complex ones
+
+# Immutability
+Immutable objects are objects whose state cannot be changed after construction.
+- Thread safe
+- Simple
+- Can be cached and reused
+- Makes good hash keys
+- Fit well with functional programming (where transformations result in new objects)
+
+Mutable objects are objects that can be modified after creation.
+- Better performance (no need to create new objects)
+- Class represents an object that has a changing state
+- Better for complex states
+
+Best practice
+- Default to Immutability
+- Minimize mutability
+- Document mutability
+
+# Law of Demeter
+Objects should avoid accessing the internal data and methods of other objects
+
+> 1. Each unit should have only limited knowledge about other units: only units "closely" related to the current unit.
+> 2. Each unit should only talk to its friends; don't talk to strangers.
+> 3. Only talk to your immediate friends.
+> \
+> Ian Holland 
+
+Benefits
+- Reduces coupling
+
+```java
+// Violates LoD
+book.getPage().getText().print();
+// LoD
+book.printPageText();
+```
