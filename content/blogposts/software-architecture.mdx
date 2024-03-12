@@ -1,0 +1,446 @@
+---
+title: 'Software architectures'
+author: 'WM'
+date: '2024-3-12'
+showTableOfContents: true
+---
+
+# Introduction
+I recently read this book on software architecture ([Fundamentals of Software Architecture: An Engineering Approach, by Mark Richards and Neal Ford](https://www.oreilly.com/library/view/fundamentals-of-software/9781663728357/)) and I found it to be very useful for software developers. The book introduces the fundamentals and more importantly it articulates and dissects common problems with software architecture and how it affects software development. 
+
+This post is a short summary/cheat sheet for the book for my own reference and I hope that you may find it useful. For a more in-depth explanation, I would recommend you to read the book.
+
+# What is Software architecture
+A software architecture consists of the following
+1. **Structure**
+2. **Architectural characteristics**: Success criteria
+3. **Architectural decisions**: Rules for implementation
+4. **Design principles**: Guidelines for making architectural decisions
+
+# Laws of software architecture
+
+1. *"Everything in software architecture is a trade-off"*
+    - *"If an architect thinks they have discovered something that isn’t a trade-off, more likely they just haven’t identified the trade-off"*
+2. Why is more important than how
+
+# Modularity
+Modularity is
+- How easily a set of standardized parts can be used to construct a more complex structure
+- An implicit architectural characteristic
+
+3 Measures
+1. **Cohesion**: To what extent the parts of a module should be contained within the same module 
+2. **Coupling**: Degree of interdependence between 2 modules
+3. **Connascence**: Two components are connascent if a change in one would require the other to be modified to maintain the **overall correctness** of the system
+
+Note: Coupling and Connascence are similar and have overlapping areas.
+- Coupling: Focuses on the physical connections between modules (Structured design)
+- Connascence: Focuses on dependency relationship between modules in object-oriented design
+
+## Cohesion
+Cohesion is the degree to which the elements inside a module belong together. It is a measure of the strength of the relationship between the elements inside a module.
+
+Degrees of Cohesion (From good to bad)
+1. **Functional cohesion:** Every part of the module is related to one another. The module contains everything essential to function
+2. **Sequential cohesion:** Two modules interact, where one outputs data that becomes the input for the other
+3. **Communicational cohesion:** Two modules form a communication chain, where each operates on information and/or contributes to some output
+4. **Procedural cohesion:** Two modules must execute in a particular order
+5. **Temporal cohesion:** Modules are related based on timing dependencies. (eg. many systems have a list of seemingly unrelated things that must be initialized at system start-up)
+6. **Logical cohesion:** Data within modules are related logically but not functionally. Operations are related but functions are quite different (Eg. static methods of StringUtils)
+7. **Coincidental cohesion:** Elements in a module are not related to other, negative form of cohesion
+
+Measure 
+1. **Lack of Cohesion in Methods (LCOM)**: "The sum of sets of methods not shared via sharing fields"
+    - Only measures structural cohesion and not logical cohesion
+
+## Coupling
+
+Measures
+1. **Afferent**: measures the number of incoming connections to a code artifact
+2. **Efferent**: measures the number of outgoing connections to other code artifact
+3. Derived metrics
+    1. **Abstractness**: Ratio of abstract artifacts (abstract classes, interface) to concrete artifacts (implementation)
+    2. **Instability**: Ratio of efferent coupling to the sum of both efferent and afferent coupling
+        - Understand it as: how much the module calls on other modules, the higher it is, the more external changes will affect the module / the more unstable it is
+    3. **Distance from main sequence**: A derived metric based on instability and abstractness (Plotting abstractness against instability)
+
+## Connascence
+
+Types (increasing order of strength of connascence / decreasing order of desirability)
+1.  **Static**: Source code level coupling
+    - **Connascence of name:** Multiple components must agree on the name of an entity
+    - **Connascence of type:** Multiple components must agree on the type of an entity
+    - **Connascence of meaning/convention:**  Multiple components must agree on meaning of a particular value
+    - **Connascence of position:** Multiple components must agree on order of values
+    - **Connascence of algorithm:** Multiple components must agree on a particular algorithm (eg. hashing algo, handshaking)
+2. **Dynamic**: analyzing calls at runtime
+    - **Connascence of execution:** order of execution
+    - **Connascence of timing:** timing of the execution of multiple components
+    - **Connascence of values:** Occurs when several values relate on one another and must change together (Eg. transaction consistency in distributed systems)
+    - **Connascence of identity:** Occurs when multiple components must reference the same entity.
+
+Properties
+1. **Strength**: An indication of desirability
+2. **Locality**: how close the modules are to each other in code base
+3. **Degree**: Size of impact (Eg. how many classes does it affect)
+
+ Jim Weirich's rules for best practice
+1. **Rule of degree**:  Convert strong forms of connascence into weaker forms of connascence (prefer static to dynamic connascence, static is easier to measure using static analysis tools)
+2. **Rule of locality**: As the distance between software components increases, use weaker forms of connascence
+
+# Architectural characteristics
+A software solution consists of both domain requirements and architectural characteristics
+
+3 criteria for architectural characteristics
+1. Specifies a non-domain design consideration
+2. Influences some structural aspect of the design
+3. Is critical or important to application success
+
+Types
+1. **Operational**: (Eg. Availability, Continuity, Performance, Recoverability, Reliability, Robustness, Scalability)
+2. **Structural**: (Eg. Configurability, Extensibility, Installability, Reusability, Localization, Maintainability, Portability, Supportability, Upgradability )
+3. **Cross-cutting**: (Eg. Accessibility, Archivability, Usability, Legal, Authentication, Authorization)
+
+## Guidelines for picking architectural characteristics
+1. List of architectural characteristics chosen as short as possible
+2. Trying to create a generic architecture is an anti-pattern (Becomes very complex before even solving the problem)
+3. Common domain concerns can be mapped to architectural characteristics (Eg. time and budget: feasibility, simplicity)
+
+# Component-based thinking
+Architects think of software as a set of components that are connected together to form a system (Eg. libraries, layers/subsystems, service, event processors)
+
+## Ways to partitioning components
+1. Technical partitioning
+2. Domain partitioning
+
+### Technical partitioning
+Separates top-level components based on technical capabilities rather than workflows
+
+Pros
+- Clearly separates customization code
+- Aligns more closely to the layered architecture pattern
+
+Cons
+- A higher degree of global coupling (changes to either common or local components will likely affect all the other components)
+- Developers may have to duplicate domain concepts in both common and local layers
+- Typically higher coupling at the data level (Eg. usually share a single database and may face difficulties when migrating to distributed system)
+
+### Domain partitioning
+Separates top-level components by workflows and/or domain
+
+Pros
+- Modelled closely with how business functions rather than an implementation detail
+- Aligns more closely towards the modular monolith and microservices architecture styles
+- Message flow matches the problem domain
+- Easier to migrate data and components to a distributed architecture
+
+Cons
+- Customization code appears in multiple places
+
+
+## Identifying components
+1. Identify initial components
+    - Top level components
+    - Top level partitioning
+2. Assign requirements to components
+    - Align requirements (user stories) to those components
+3. Analyze role and responsibilities
+    - Must make sure role and responsibilities match up with component (granularity)
+4. Analyze architectural characteristics
+    - See how architecture characteristics of component can affect granularity and component division
+5. Restructure components
+
+### Component Design
+An architect takes requirements and tries to determine what coarse-grained building blocks will make up the application
+
+When determining the granularity of components
+- Too fine
+    - Too much communication between components to achieve results
+- Too coarse
+    - Encourages high internal coupling
+    - Affects deployability and testability
+
+Techniques to determine granularity
+1. **Actor/action approach**: 
+    - Steps
+        - Identifies actors who perform activities with the application and the actions those actors may perform
+    - Suited for
+        - All types of systems
+2. **Event storming**: 
+    - Steps
+        - Architect assumes the project will use messages and/or events to communicate between the various components
+        - Determine which events occur in the system based on requirements and identified roles
+        - Build components around those event and message handlers
+    - Suited For
+        - Distributed architectures (eg. microservices)
+3. **Workflow approach**: 
+    - Models components around workflows (like event storming but without explicit constraints of building a message-based system)
+    - Steps
+        - Identify key roles
+        - Determine the kinds of workflows these roles engage in
+        - Build components around identified activities
+
+Anti-patterns
+- Entity trap: Making a manager out of each identified entity 
+    - Incorrectly identifies database relationships as workflows in the application
+    - Too coarse-grained offering no guidance to the developer in terms of structure and packaging of overall code
+
+# Architectural styles
+
+Monolith
+1. **Single Unit:** Monolithic applications are structured as a single, tightly integrated unit, where all components and functionality are part of the same codebase and execution process.
+2. **Scalability:** Scaling a monolith typically involves replicating the entire application, which can be inefficient and costly.
+3. **Development:** Easier to develop initially but can become complex and challenging to maintain as the application grows.
+4. **Deployment:** Requires deploying the entire application when making updates or changes.
+5. **Resource Sharing:** All components share the same resources, including databases and servers.
+6. **Communication:** Inter-component communication is typically done through function or method calls.
+7. **Failure Impact:** A failure in one part of the application can impact the entire system.
+
+Distributed:
+1. **Multiple Components:** Distributed applications are composed of multiple loosely coupled components that communicate over a network.
+2. **Scalability:** Offers more granular scalability, as individual components or services can be scaled independently.
+3. **Development:** Can be more complex initially due to distributed nature but can promote modularity and ease of maintenance in the long run.
+4. **Deployment:** Allows for continuous deployment of individual components without affecting the entire system.
+5. **Resource Sharing:** Components can have their own dedicated resources and databases.
+6. **Communication:** Inter-component communication typically relies on network protocols, APIs, or message queues.
+7. **Failure Isolation:** Failures in one component generally do not affect the entire system due to isolation.
+
+## Distributed Architecture drawbacks
+1. Network may be unreliable (Need timeouts and circuit breakers in the system)
+2. Latency is not zero (Need to see if latency is acceptable)
+3. Bandwidth is not infinite (Internal messaging)
+4. Network is not secure (Increased surface area for attack)
+5. Topology changes (Eg. changes in routers/hub/firewall/switches can affect the system)
+6. Transport Cost Is not Zero
+7. Network is not homogeneous 
+8. Need distributed logging (To perform root cause analysis)
+9. Need distributed transactions
+10. Need Contract maintenance and versioning (Eg. API versioning, making sure different services agree on the same contract)
+
+# Styles 
+1. Monolith
+    - **Layered / n-tiered**
+    - **Pipeline**
+    - **Microkernel**
+2. Distributed
+    - **Service-based**
+    - **Event-driven**
+    - **Space-based**
+    - **Orchestration-driven service oriented**
+    - **Microservices**
+
+## Monolith: Layered / n-tiered
+- Topology
+    - Technically partitioned
+    - Components organized in logical horizontal layers
+    - Each layer can be open/closed 
+        - Closed: no skipping of layers
+        - Open: can skip layers
+- Pros
+    - Separation of concerns
+    - Simple, low cost
+    - Natural way to develop (Conway's law)
+    - Natural to developers because of technical partioning
+    - Layers of isolation 
+- Cons
+    - Lack of agility (business domain spread throughout layers)
+    - Deployability/testability is low (low frequency of deployment because you need to test the entire system)
+    - Elasticity and scalability is low
+    - Performance is low
+    - Does not support fault tolerance
+- Anti-patterns
+    - Sinkhole: request move from one layer to another as pass-through processing, no business logic applied (waste resources)
+
+## Monolith: Pipeline
+- Topology
+    - Data flows through pipes and filters
+    - Pipe: unidirectional, point-to-point
+    - Filters: self-contained, stateless
+        - **Producer**: starting point of a process, outbound only
+        - **Transformer**: accepts input, optionally performs a transformation on some or all of the data then forwards it to the outbound pipe
+        - **Consumer:** termination point for the pipeline
+        - **Tester**: accepts input, test one or more criteria, and optionally produces output based on test
+- Pros
+    - Low cost, simple
+    - Modular
+    - Compositional reuse
+- Cons
+    - Elasticity and scalability is low
+    - Does not support fault tolerance
+
+## Monolith: Microkernel
+- Topology
+    - Plugin architecture
+    - Consist of
+        - Core system (microkernel) 
+        - Set of pluggable modules (plugins should not be dependent on one another)
+    - Requires
+        - Registry: The core system needs to know which plugin modules are available and how to access them, and contains info about each plugin 
+        - Contract: What plugin offers (Eg. JSON, XML)
+- Pros
+    - Simple
+    - Supports both technical and domain partitioning
+    - Better Testability, deployability, and reliability rate 
+    - Better modularity and extensibility
+- Cons
+    - Weak in Scalability and Fault tolerance (monolith nature)
+
+## Distributed: Service-based
+- Hybrid of microservices and monolith
+- Topology
+    - Domain-partitioned architecture
+    - Separately deployed user interface
+    - Separately deployed remote coarse-grained services
+    - Centrally shared monolithic database
+        - Avoid database coupling: different services share a single database and changing the schema can break many services
+        - Instead logically partition the database and implement the partition using federated shared libraries
+- Pros 
+    - Simple 
+    - Greater agility because of separately deployed domain services 
+    - Better testability due to the limited scope of each domain service
+    - Better deployability 
+    - Better fault tolerance and availability
+- Cons
+    - Scalability not as good (Coarse-grained services)
+    - Elasticity is not as good
+
+## Distributed: Event-driven
+- Topology
+    - Decoupled event processing components that asynchronously receive and process events
+    - Events are broadcasted
+    - Asynchronous communication can result in data loss
+        - Lost in transit
+            - Use persisted message queues
+            - Use synchronous send (sender blocks until broker acknowledges receipt)
+        - Receiver dequeues event but crashes
+            - Client should only acknowledge receipt of the event to the event queue/broker after it has been processed
+    - Technically partitioned
+        - Any domain is spread across multiple event processors
+        - Any change in a domain affects many event processors
+    - 2 types
+        - Broker
+        - Mediator
+    - How to process synchronous requests/retrieval requests: Use Request-Reply pattern: Use a request and reply event queue with a correlation ID to match request and reply
+    - Can be combined with other architectural styles
+- Pros
+    - Very good performance (async communication)
+    - Scalability (load balancing of event processors)
+    - Fault tolerance (highly decoupled and async event processors provide eventual consistency and eventual processing of event flow)
+- Cons
+    - More complex, harder to test (due to dynamic event flows)
+
+### Broker
+No central mediator for coordination and orchestration of event flow (consists of initiating and processing events)
+
+Consists of 
+- **Initiating event**
+- **Event broker**: usually uses pub/sub mechanism with different topics for different domains events
+- **Event processor**
+- **Processing event**: Good practice: Event processor should advertise what it did to the rest of the system even if it is not used yet
+
+Pros: Simple, high responsiveness
+
+Cons: Hard to handle errors
+
+### Mediator
+An event mediator manages and controls the workflow for initiating events that require the coordination of multiple event processors.
+
+Consists of 
+- **Initiating event**
+- **Event queue**
+- **Event mediator**
+    - Knows the steps involved in processing the event 
+    - Maintain event state and manage error handling, recoverability, and restart capabilities
+- **Event channels**
+- **Event processors**: Listens to dedicated event channels, process the event, and then publish the result to the event mediator
+
+Pros: Better for error handling, and consistency and suited for processes that require greater control
+
+Cons: Lower scalability, coupling between event processes, lower fault tolerance
+
+## Distributed: Space-based
+- High volume, large concurrent user load applications are usually limited by the database
+- Therefore, use caching for the transactions, removing the need for directly reading/writing to database
+- Design to address
+    - High scalability issues
+    - High Elasticity issues
+    - High concurrency issues
+    - Or applications where there are variable and unpredictable loads
+- Space-based comes from the term tuple space (technique of using multiple parallel processors operating on shared memory)
+- Topology
+    - Relies on caching for the transactions and thus, removes the need for directly reading/writing to the database
+    - Technically and domain partitioned
+        - Domain partitioned: different processing units for different domain
+        - Technical partitioned: separates technical functionalities such as transactional processing and storage of data using data pumps
+- Consists of
+    - **In-memory data grid**: contains application data
+    - **Processing unit:** contains the business logic and the in-memory data grid which is replicated across other processing units
+    - **Virtualized middleware**: handles infra that controls data synchronization and request handing
+        - **Messaging grid:** manages input request and session state
+            - Assign and route input requests to the processing unit (eg. round robin, next-available)
+            - Usually done by nginx
+        - **Data grid:** manages data replication across processing units
+            - Each processing unit should contain the same data in its in-memory data grid because requests can be sent to any competing processing unit
+            - Usually implemented within processing units as a replicated cache
+            - Allows processing units to start up without having to read from the database (if there is already one instance containing the named replicated cache)
+        - **Processing grid:** Optional component that manages orchestrated request processing when there are multiple processing units involved in a single business request
+        - **Deployment manager:** Manage dynamic startup and shutdown of processing unit instances based on load conditions 
+    - **Data pumps:** Asynchronously send updated data to the database
+        - Enables processing units to continue processing without waiting for database operations (asynchronous)
+        - Provides eventual consistency with the in-memory cache and the database
+        - Implementing using messaging
+    - **Data writers:** Perform the updates from the data pumps
+    - **Data readers:** Read database data and deliver it to processing units upon startup
+- Pros
+    - Maximizes elasticity, scalability and performance
+        - Leverages in-memory data caching, removing database as a constraint
+- Cons
+    - Complex
+        - Due to caching and eventual consistency of the primary data store
+        - Must make sure that there is no data lost in the event of a crash
+    - Difficult to test (Hard to simulate large volume of data)
+    - Expensive (Licensing fees for caching products and high resource utilization)
+
+## Distributed: Orchestration-driven service oriented
+- Topology
+    - Centered around reuse as much as possible (Takes technical partitioning to the extreme)
+    - **Business services:** entry point, contain no code, just service definitions
+    - **Enterprise services:** fine-grained, shared implementations. Make up coarse-grained business services, tied together by orchestration engine
+    - **Application services:** one-off, single-implementation services (not all services require the same level of granularity or reuse as enterprise services)
+    - **Infrastructure services:** Supply operational concerns, such as monitoring, logging, authentication, and authorization
+    - **Orchestration engine:** stitch together the business service implementations using orchestration, including features like transactional coordination and message transformation
+        - Usually, architecture is tied to one relational database
+        - Transactional behaviour is handled here
+- Pros
+    - Reuse
+- Cons
+    - Bad Deployability/ testability
+        - High coupling
+
+## Distributed: Microservices
+- Inspired by domain-driven design (DDD)
+- Takes domain partitioning to the extreme
+- Topology
+    - **Service**: Each service to include all necessary parts to operate independently (Eg. schema, components, databases) 
+        - Avoids all kinds of coupling
+        - Each service runs its own process
+        - Challenging to find the correct granularity for services
+    - **Communication**: 
+        - Choose between asynchronous and synchronous
+        - Choose between Choreography (Broker) and Orchestration (Mediator)
+        - Usually Protocol-aware: each service must know how to call other services
+        - Usually Heterogenous: must support polyglot environments
+        - Usually Interoperable
+    - Rule of thumb: if you need to do transactions between services, fix the granularity of the services first.
+        - Because transaction boundaries are an indicator of service granularity
+- Pros
+    - High support for modern engineering practices (Devops)
+    - Good fault tolerance and reliability (But can be impacted when too much inter-service communication is used)
+    - High Scalability and elasticity
+    - Evolutionary (Decoupled nature of microservices)
+    - High deployability (Made up of small deployment units)
+- Cons
+    - Performance
+        - Must make many network calls to complete work
+        - Have communication overheads (eg. security)
+        - Can use caching to alleviate performance issues
