@@ -1,0 +1,1553 @@
+---
+title: Design patterns in Java
+author: 'WM'
+date: '2024-3-15'
+showTableOfContents: true
+---
+
+# Introduction 
+I've compiled this cheat sheet when I was refreshing my memory on design patterns, and you may find it useful as a reference.
+
+# Creational patterns
+1. Builder
+2. Factory method
+3. Abstract factory
+4. Prototype
+5. Singleton
+6. Builder
+
+## Builder
+Removes the need for a constructor with many parameters.
+
+```java
+public class Car {
+    // Required parameters
+    private final String make;
+    private final String model;
+    // Optional parameters
+    private final int year;
+    private final String color;
+    private final boolean sunroof;
+    private final boolean navigationSystem;
+
+    private Car(Builder builder) {
+        this.make = builder.make;
+        this.model = builder.model;
+        this.year = builder.year;
+        this.color = builder.color;
+        this.sunroof = builder.sunroof;
+        this.navigationSystem = builder.navigationSystem;
+    }
+
+    // Getters and other methods here...
+
+    public static class Builder {
+        // Required parameters
+        private final String make;
+        private final String model;
+
+        // Optional parameters - initialized to default values
+        private int year = 0; // default year
+        private String color = "Black"; // default color
+        private boolean sunroof = false;
+        private boolean navigationSystem = false;
+
+        public Builder(String make, String model) {
+            this.make = make;
+            this.model = model;
+        }
+        public Builder year(int value) {
+            year = value;
+            return this;
+        }
+        public Builder color(String value) {
+            color = value;
+            return this;
+        }
+        public Builder sunroof(boolean value) {
+            sunroof = value;
+            return this;
+        }
+        public Builder navigationSystem(boolean value) {
+            navigationSystem = value;
+            return this;
+        }
+        public Car build() {
+            return new Car(this);
+        }
+    }
+}
+```
+Optional Director class helps to assemble the object in a specific order and helps with reuse of common construction code.
+
+```java
+public class CarDirector {
+    private Car.Builder builder;
+
+    public CarDirector(Car.Builder builder) {
+        this.builder = builder;
+    }
+
+    public void constructSportsCar() {
+        builder.color("Red")
+               .sunroof(true)
+               .navigationSystem(true)
+               .year(2022);
+        // Additional sports car specific configuration can go here
+    }
+
+    public void constructFamilyCar() {
+        builder.color("Blue")
+               .sunroof(false)
+               .navigationSystem(true)
+               .year(2022);
+        // Additional family car specific configuration can go here
+    }
+
+    public Car build() {
+        return builder.build();
+    }
+}
+```
+## Factory method
+Reduce coupling by separating construction and usage of the object.
+- Give flexibility to subclasses to decide which class to instantiate 
+- Usage of the object is defined in the super class.
+
+Components
+- Creator: declares the factory method, which returns a new product
+- Product: interface for the objects that the factory method creates
+
+```java
+// Product class
+public interface Transport {
+    void deliver();
+}
+public class Truck implements Transport {
+    @Override
+    public void deliver() {
+        System.out.println("Delivering by land in a box.");
+    }
+}
+public class Ship implements Transport {
+    @Override
+    public void deliver() {
+        System.out.println("Delivering by sea in a container.");
+    }
+}
+// Creator clas
+public abstract class Logistics {
+    public abstract Transport createTransport();
+
+    public void planDelivery() {
+        Transport transport = createTransport();
+        transport.deliver();
+    }
+}
+public class RoadLogistics extends Logistics {
+    @Override
+    public Transport createTransport() {
+        return new Truck();
+    }
+}
+public class SeaLogistics extends Logistics {
+    @Override
+    public Transport createTransport() {
+        return new Ship();
+    }
+}
+
+public class FactoryMethodDemo {
+    public static void main(String[] args) {
+        Logistics logistics = new RoadLogistics();
+        logistics.planDelivery(); // Output: Delivering by land in a box.
+        logistics = new SeaLogistics();
+        logistics.planDelivery(); // Output: Delivering by sea in a container.
+    }
+}
+```
+## Abstract factory
+Extension of factory method pattern to create different families of objects. Adding more factory methods for different types of objects.
+
+```java
+// Product classes
+public interface Button {
+    void paint();
+}
+public interface Checkbox {
+    void paint();
+}
+// Concrete product classes
+public class LightButton implements Button {
+    public void paint() {
+        System.out.println("Rendering button in light theme");
+    }
+}
+public class LightCheckbox implements Checkbox {
+    public void paint() {
+        System.out.println("Rendering checkbox in light theme");
+    }
+}
+public class DarkButton implements Button {
+    public void paint() {
+        System.out.println("Rendering button in dark theme");
+    }
+}
+public class DarkCheckbox implements Checkbox {
+    public void paint() {
+        System.out.println("Rendering checkbox in dark theme");
+    }
+}
+// Abstract creators/factories
+public interface GUIFactory {
+    Button createButton();
+    Checkbox createCheckbox();
+}
+// Concrete creators/factories
+public class LightThemeFactory implements GUIFactory {
+    public Button createButton() {
+        return new LightButton();
+    }
+    public Checkbox createCheckbox() {
+        return new LightCheckbox();
+    }
+}
+public class DarkThemeFactory implements GUIFactory {
+    public Button createButton() {
+        return new DarkButton();
+    }
+    public Checkbox createCheckbox() {
+        return new DarkCheckbox();
+    }
+}
+// Application class
+public class Application {
+    private Button button;
+    private Checkbox checkbox;
+    public Application(GUIFactory factory) {
+        button = factory.createButton();
+        checkbox = factory.createCheckbox();
+    }
+    public void paint() {
+        button.paint();
+        checkbox.paint();
+    }
+}
+
+public class Demo {
+    public static void main(String[] args) {
+        GUIFactory factory = new DarkThemeFactory();
+        Application app = new Application(factory);
+        app.paint();
+    }
+}
+```
+
+## Prototype
+Used when we want to create a new object by copying an existing object and we also want to keep out copying code independent of the classes of the objects being copied.
+
+Note: Need to decide whether to use shallow or deep copy and call the clone methods appropriately
+
+The key here is to use a constructor with its own class as an argument
+
+```java
+public abstract class Shape {
+    protected String color;
+    public Shape(Shape shape) {
+        this.color = shape.color;
+    }
+    public abstract Shape clone();
+}
+
+public class Circle extends Shape {
+    private int radius;
+
+    public Circle(String color, int radius){
+        super(color);
+        this.radius = radius;
+     }
+
+    public Circle(Circle circle){
+        super(circle);
+        this.radius = circle.radius;
+    }
+
+    @Override
+    public Circle clone() {
+        return new Circle(this);
+    }
+}
+
+public class PrototypeDemo {
+    public static void main(String[] args) {
+        Circle circle = new Circle("Red", 10);
+        Circle clonedCircle = circle.clone();
+    }
+}
+```
+
+Use prototype registry to store the prebuilt objects and you can clone them when needed.
+
+```java
+public class ShapeRegistry {
+    private Map<String, Shape> shapes = new HashMap<>();
+
+    public void addShape(String key, Shape shape) {
+        shapes.put(key, shape);
+    }
+
+    public Shape getShape(String key) {
+        Shape shape = shapes.get(key);
+        if (shape != null) {
+            return shape.clone();
+        }
+        throw new IllegalArgumentException("No shape found for key: " + key);
+    }
+}
+
+```
+
+## Singleton
+When you want to ensure that a class has only one instance (Eg. database). 
+
+Make the default constructor private and provide a static method to get the instance.
+
+Thread safety
+- Use synchronized block to ensure only one instance is created
+- Only use synchronize when the instance is null, to avoid performance issues
+- Use the volatile keyword to ensure that the instance is not a partially created object and prevent another thread from using it before it is ready
+
+```java 
+public class Singleton {
+    private static volatile Singleton instance;
+    private Singleton() {}
+
+    public static Singleton getInstance() {
+        Singleton result = instance;
+        if (result == null) {
+            synchronized (Singleton.class) {
+                result = instance;
+                if (result == null) {
+                    instance = new Singleton();
+                }
+            }
+        }
+        return result; 
+    }
+}
+```
+
+# Structural patterns
+1. Adapter
+2. Bridge
+3. Composite
+4. Decorator
+5. Facade
+6. Flyweight
+7. Proxy
+
+## Adapter
+Allows incompatible interfaces to work together.
+
+Components 
+- Client: uses the adapter to interact with the adaptee
+- Client interface: the interface that other classes must implement to work with the client
+- Adapter: adapts the interface of the adaptee to the target interface
+- Service: some third-party or legacy code that has an incompatible interface
+
+The key here is that the adapter implements the client interface and uses the adaptee to perform the required action (You need a client interface for it to work)
+
+```java 
+// client interface
+public interface Logger {
+    void log(String message);
+}
+public class ConsoleLogger implements Logger {
+    public void log(String message) {
+        System.out.println("ConsoleLogger: " + message);
+    }
+}
+// Service
+public class Log4jLogger {
+    public void logMessage(String level, String message) {
+        System.out.println("Log4jLogger [" + level + "]: " + message);
+    }
+}
+
+// Adapter
+public class Log4jAdapter implements Logger {
+    private Log4jLogger log4jLogger;
+    public Log4jAdapter(Log4jLogger log4jLogger) {
+        this.log4jLogger = log4jLogger;
+    }
+    @Override
+    public void log(String message) {
+        log4jLogger.logMessage("INFO", message);
+    }
+}
+
+// Client
+public class LoggingClient {
+    public static void main(String[] args) {
+        // Using the simple console logger
+        Logger logger = new ConsoleLogger();
+        logger.log("This is a console log message.");
+
+        // Switching to Log4j without changing the `Logger` interface usage
+        Log4jLogger log4jLogger = new Log4jLogger();
+        Logger adaptedLogger = new Log4jAdapter(log4jLogger);
+        adaptedLogger.log("This message is logged using Log4j via the adapter.");
+    }
+}
+```
+## Bridge
+Helps to split a large class into two separate loosely coupled hierarchies.
+
+Useful when you realize that you are implementing an interface/abstract class that is going in 2 different dimensions which can change independently. The solution is to use composition instead of inheritance.
+
+So client code would not be exposed to implementation details.
+
+Components
+- Abstraction: provides high-level control logic
+- Refined abstraction: Work with different implementations
+- Implementation: the interface of the other dimension 
+- Concrete implementation: contain the actual implementation
+
+```java
+// Implementation 
+interface DBImplementor {
+    void connect();
+    void executeQuery(String query);
+    void disconnect();
+}
+
+class SQLDBImplementor implements DBImplementor {
+    public void connect() {
+        System.out.println("Connecting to SQL Database...");
+    }
+    public void executeQuery(String query) {
+        System.out.println("Executing SQL Query: " + query);
+    }
+    public void disconnect() {
+        System.out.println("Disconnecting from SQL Database...");
+    }
+}
+
+class NoSQLDBImplementor implements DBImplementor {
+    public void connect() {
+        System.out.println("Connecting to NoSQL Database...");
+    }
+    public void executeQuery(String query) {
+        System.out.println("Executing NoSQL Command: " + query);
+    }
+    public void disconnect() {
+        System.out.println("Disconnecting from NoSQL Database...");
+    }
+}
+
+// Abstraction
+abstract class Database {
+    protected DBImplementor implementor;
+    protected Database(DBImplementor implementor) {
+        this.implementor = implementor;
+    }
+    abstract void connect();
+    abstract void executeQuery(String query);
+    abstract void disconnect();
+}
+
+class RefinedDatabase extends Database {
+    public RefinedDatabase(DBImplementor implementor) {
+        super(implementor);
+    }
+    public void connect() {
+        implementor.connect();
+    }
+    public void executeQuery(String query) {
+        implementor.executeQuery(query);
+    }
+    public void disconnect() {
+        implementor.disconnect();
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        Database sqlDatabase = new RefinedDatabase(new SQLDBImplementor());
+        sqlDatabase.connect();
+        sqlDatabase.executeQuery("SELECT * FROM users");
+        sqlDatabase.disconnect();
+
+        Database noSqlDatabase = new RefinedDatabase(new NoSQLDBImplementor());
+        noSqlDatabase.connect();
+        noSqlDatabase.executeQuery("{ find: 'users' }");
+        noSqlDatabase.disconnect();
+    }
+}
+```
+
+## Composite
+Compose objects into tree structures and work with them as if they were individual objects.
+
+Use it when 
+- It is a tree-like structure
+- Need to treat both the composite and leaf objects uniformly
+
+Components  
+- Component: an interface that declares the operations of the object in the composition
+- Leaf: represents leaf objects in the composition
+- Composite: represents a composite object in the composition
+
+Examples: file system structures, UI components, menus with submenus
+
+```java
+// Component
+public interface Graphic {
+    void draw();
+}
+
+// Leaf
+public class Circle implements Graphic {
+    public void draw() {
+        System.out.println("Drawing a Circle");
+    }
+}
+public class Rectangle implements Graphic {
+    public void draw() {
+        System.out.println("Drawing a Rectangle");
+    }
+}
+
+// Composite
+public class GraphicGroup implements Graphic {
+    private List<Graphic> children = new ArrayList<>();
+    public void draw() {
+        for (Graphic graphic : children) {
+            graphic.draw(); // Delegate to child objects
+        }
+    }
+    public void add(Graphic graphic) {
+        children.add(graphic);
+    }
+    public void remove(Graphic graphic) {
+        children.remove(graphic);
+    }
+    public Graphic getChild(int index) {
+        return children.get(index);
+    }
+}
+
+public class Demo {
+    public static void main(String[] args) {
+        Graphic circle1 = new Circle();
+        Graphic rectangle = new Rectangle();
+        Graphic circle2 = new Circle();
+
+        GraphicGroup graphicGroup = new GraphicGroup();
+        graphicGroup.add(circle1);
+        graphicGroup.add(rectangle);
+        graphicGroup.add(circle2);
+
+        graphicGroup.draw(); // Draws all elements in the group
+    }
+}
+```
+
+## Decorator
+Attach new behaviors to objects by placing these objects inside special wrapper objects (composition over inheritance)
+
+Components
+- Component: declare an interface that will be implemented by concrete components and decorators
+- Concrete component: the wrapped object
+- Base decorator: the abstract class that implements the component interface and holds the wrapped component
+- Concrete decorator: adds new behaviour to the wrapped object by extending the base decorator
+
+```java
+// Component
+public interface DeliveryNotification {
+    String send();
+}
+
+// Concrete component
+public class BasicNotification implements DeliveryNotification {
+    @Override
+    public String send() {
+        return "Your order has been shipped.";
+    }
+}
+
+// Base decorator
+public abstract class NotificationDecorator implements DeliveryNotification {
+    protected DeliveryNotification wrappedNotification;
+    public NotificationDecorator(DeliveryNotification notification) {
+        this.wrappedNotification = notification;
+    }
+    public String send() {
+        return wrappedNotification.send();
+    }
+}
+
+// Concrete decorator
+public class SMSNotificationDecorator extends NotificationDecorator {
+    public SMSNotificationDecorator(DeliveryNotification notification) {
+        super(notification);
+    }
+    @Override
+    public String send() {
+        return super.send() + " Sent via SMS.";
+    }
+}
+
+public class EmailNotificationDecorator extends NotificationDecorator {
+    public EmailNotificationDecorator(DeliveryNotification notification) {
+        super(notification);
+    }
+    @Override
+    public String send() {
+        return super.send() + " Sent via Email.";
+    }
+}
+
+public class ECommerceApp {
+    public static void main(String[] args) {
+        DeliveryNotification notification = new BasicNotification();
+        notification = new SMSNotificationDecorator(notification);
+        notification = new EmailNotificationDecorator(notification);
+        System.out.println(notification.send());
+    }
+}
+
+```
+
+## Facade
+Provides a simple interface to a library or API
+
+Components
+- Facade: provides a simplified interface
+- Additional Facade: a separate interface to provide a simpler interface to a complex subsystem
+
+Use additional facade classes to provide a simpler interface to a complex subsystem (prevents "god" classes)
+
+```java
+
+class TV {
+    public void turnOn() { System.out.println("TV turned on."); }
+    public void turnOff() { System.out.println("TV turned off."); }
+}
+
+class SoundSystem {
+    public void turnOn() { System.out.println("Sound system turned on."); }
+    public void turnOff() { System.out.println("Sound system turned off."); }
+    public void setVolume(int level) { System.out.println("Volume set to " + level); }
+}
+
+class StreamingDevice {
+    public void turnOn() { System.out.println("Streaming device turned on."); }
+    public void turnOff() { System.out.println("Streaming device turned off."); }
+    public void playMovie(String movie) { System.out.println(movie + " is playing."); }
+}
+
+class EntertainmentSystemFacade {
+    private TV tv;
+    private SoundSystem soundSystem;
+    private StreamingDevice streamingDevice;
+
+    public void watchMovie(String movie) {
+        tv.turnOn();
+        soundSystem.turnOn();
+        soundSystem.setVolume(50);
+        streamingDevice.turnOn();
+        streamingDevice.playMovie(movie);
+    }
+
+    public void turnOff() {
+        streamingDevice.turnOff();
+        soundSystem.turnOff();
+        tv.turnOff();
+    }
+}
+```
+
+## Flyweight
+When you want to fit more objects into the available memory by sharing as much data as possible with similar objects.
+
+Only use if RAM usage is a problem so that premature optimization is avoided.
+
+Each object is divided into intrinsic and extrinsic state
+- **Intrinsic state **is shared (immutable, invariant, context-independent and never altered at runtime) 
+- **Extrinsic state** is unique to the object (mutable can be altered at runtime)
+
+Components
+- Flyweight: contains the intrinsic state and is shared between objects
+- Flyweight factory: creates and manages flyweight objects which are reused
+
+```java
+// Flyweight
+public class BookType {
+    private final String title;
+    private final String author;
+    private final String genre;
+    public BookType(String title, String author, String genre) {
+        this.title = title;
+        this.author = author;
+        this.genre = genre;
+    }
+    public String getTitle() {
+        return title;
+    }
+    public String getAuthor() {
+        return author;
+    }
+    public String getGenre() {
+        return genre;
+    }
+}
+
+// Flyweight factory
+public class BookTypeFactory {
+    private static final Map<String, BookType> bookTypes = new HashMap<>();
+
+    public static BookType getBookType(String title, String author, String genre) {
+        String key = title + "|" + author + "|" + genre;
+        BookType bookType = bookTypes.get(key);
+        if (bookType == null) {
+            bookType = new BookType(title, author, genre);
+            bookTypes.put(key, bookType);
+        }
+        return bookType;
+    }
+}
+
+public class Book {
+    private BookType bookType;
+    private int checkoutDuration;
+    private String holder;
+
+    public Book(BookType bookType, int checkoutDuration, String holder) {
+        this.bookType = bookType;
+        this.checkoutDuration = checkoutDuration;
+        this.holder = holder;
+    }
+}
+
+public class LibraryDemo {
+    public static void main(String[] args) {
+        BookType bookType1 = BookTypeFactory.getBookType(
+            "Effective Java", "Joshua Bloch", "Programming");
+        Book book1 = new Book(bookType1, 14, "John Doe");
+
+        BookType bookType2 = BookTypeFactory.getBookType(
+            "Effective Java", "Joshua Bloch", "Programming");
+        Book book2 = new Book(bookType2, 30, "Jane Doe");
+
+        System.out.println("Book1 and Book2 have the same BookType: " + 
+            (book1.getBookType() == book2.getBookType()));
+    }
+}
+
+```
+
+## Proxy
+Provides a placeholder for another object to control access to it.
+
+Useful for access control, monitoring, logging, and lazy loading
+```java
+public interface BankAccount {
+    void displayBalance();
+}
+
+public class RealBankAccount implements BankAccount {
+    private int balance;
+    @Override
+    public void displayBalance() {
+        System.out.println("Account balance: $" + balance);
+    }
+}
+
+public class BankAccountProxy implements BankAccount {
+    private RealBankAccount realAccount;
+    private boolean isAuthenticatedUser;
+
+    public BankAccountProxy(int balance, boolean isAuthenticatedUser) {
+        this.realAccount = new RealBankAccount(balance);
+        this.isAuthenticatedUser = isAuthenticatedUser;
+    }
+
+    @Override
+    public void displayBalance() {
+        if (isAuthenticatedUser) {
+            realAccount.displayBalance();
+        } else {
+            System.out.println("Access Denied: Unauthorized user cannot access account balance.");
+        }
+    }
+}
+
+public class Client {
+    public static void main(String[] args) {
+        BankAccount accountProxy = new BankAccountProxy(1000, true);
+        accountProxy.displayBalance(); // This will display the balance.
+
+        BankAccount accountProxyDenied = new BankAccountProxy(1000, false);
+        accountProxyDenied.displayBalance(); // Access denied message.
+    }
+}
+```
+
+# Behavioral patterns
+1. Chain of responsibility
+2. Command
+3. Mediator
+4. Iterator
+5. Memento
+6. Observer
+7. State
+8. Strategy
+9. Template method
+
+## Chain of responsibility
+Transforms behaviors into a chain of handlers in a particular order.
+- Each handler can choose to process or pass it along the chain
+- Handlers can be inserted and reordered dynamically.
+
+Why use it?
+- Decouple sender and receiver of a request/command
+- When it is possible for multiple receivers to handle a request
+
+```java 
+// Handler 
+public abstract class Handler {
+    protected Handler next;
+    public void setNext(Handler next) {
+        this.next = next;
+    }
+    public boolean handleNext(){
+        if (next == null) {
+            return true;
+        }
+        return next.handleRequest(requestType);
+    }
+    abstract boolean handleRequest(String requestType);
+}
+// Concrete handler
+class ConcreteHandlerA extends Handler {
+    void handleRequest(String requestType) {
+        if(requestType != "TypeA") {        
+            return false;
+        }
+        System.out.println("ConcreteHandlerA handled request of TypeA");
+        return handleNext();
+    }
+}
+
+class ConcreteHandlerB extends Handler {
+    void handleRequest(String requestType) {
+        if(requestType != "TypeB") {        
+            return false;
+        }
+        System.out.println("ConcreteHandlerB handled request of TypeB");
+        return handleNext();
+    }
+}
+
+public class Demo {
+    public static void main(String[] args) {
+        Handler handlerA = new ConcreteHandlerA();
+        Handler handlerB = new ConcreteHandlerB();
+        handlerA.setNext(handlerB);
+        handlerA.handleRequest("TypeA"); 
+    }
+}
+
+```
+
+## Command
+Turns a request into a standalone object that encapsulates all information required to perform the request.
+
+Decouples invoker and receiver, so that the same functionality can be reused with different invokers.
+
+Other benefits
+- Can queue the commands
+- Easy to implement undo/redo
+- Composite Commands
+
+Main components
+- Command: Interface for executing an operation
+- Concrete command: Implements the command interface and contains the receiver object
+- Receiver: Knows how to perform the operation
+- Invoker: Initiates the command
+- Client: Configures the command and the receiver
+
+```java
+// Command interface
+public interface Command {
+    void execute();
+}
+// Concrete commands
+public class PasteCommand implements Command {
+    private Document document;
+    public PasteCommand(Document document) {
+        this.document = document;
+    }
+    @Override
+    public void execute() {
+        document.paste();
+    }
+}
+public class CopyCommand implements Command {
+    private Document document;
+    public CopyCommand(Document document) {
+        this.document = document;
+    }
+    @Override
+    public void execute() {
+        document.copy();
+    }
+}
+
+// Receiver
+public class Document {
+    public void paste() {
+        System.out.println("Pasting text into the document.");
+    }
+    public void copy() {
+        System.out.println("Copying text from the document.");
+    }
+}
+
+// Invoker: Initates command
+public class MenuOptions {
+    private Command copy;
+    private Command paste;
+
+    public MenuOptions(Command copy, Command paste) {
+        this.copy = copy;
+        this.paste = paste;
+    }
+    public void clickCopy() {
+        copy.execute();
+    }
+    public void clickPaste() {
+        paste.execute();
+    }
+}
+
+// Client: Configures commands
+public class Editor {
+    public static void main(String[] args) {
+        Document document = new Document();
+        Command copy = new CopyCommand(document);
+        Command paste = new PasteCommand(document);
+
+        MenuOptions menu = new MenuOptions(copy, paste);
+        menu.clickCopy();
+        menu.clickPaste();
+    }
+}
+```
+
+## Mediator
+Use a mediator to restrict and control the interaction between objects, preventing messy and unstructured connections between objects. 
+
+Decouples component objects and abstracts relationships between the objects, encapsulating their interaction in a single class.
+
+Allows components reuse by declaring a new mediator class
+
+Components
+- Mediator: declares methods of communication with components
+- Concrete mediator: encapsulate relations between various components
+- Component interface: contain some business logic
+
+```java
+// This is more resuable as compared to doing the login logic on the loginButton onClick method
+// Mediator
+public interface Mediator {
+    void login();
+}
+
+public class Dialog implements Mediator {
+    private TextBox userTextBox;
+    private TextBox passwordTextBox;
+    private Button loginButton;
+
+    @Override
+    public void login(){
+        String username = userTextBox.getText();
+        String password = passwordTextBox.getText(); 
+    }
+}
+
+// Component
+public interface Component {
+    void setMediator(Mediator mediator);
+    String getName();
+}
+
+public class Button implements Component{
+    private Mediator mediator;
+    private String name;
+
+    public Button(String name) {
+        this.name = name;
+    }
+
+    @Override
+    public void setMediator(Mediator mediator) {
+        this.mediator = mediator;
+    }
+
+    @Override
+    public String getName() {
+        return name;
+    }
+
+    public void click() {
+        mediator.login();
+    }
+}
+```
+
+## Iterator
+Simplifies traversal of a collection without exposing its underlying representation.
+
+Components
+- Iterator: declare traversal options 
+- Concrete Iterator: implement specific algorithm for traversal
+- Iterable collection interface: declares method to get the iterator
+- Concrete collection: returns a concrete iterator
+
+```java
+// Iterator
+public interface Iterator {
+    boolean hasNext();
+    Object next();
+}
+
+ private class SimpleListIterator implements Iterator<Integer> {
+    private SimpleList simpleList;
+    private int index;
+
+    public SimpleListIterator(SimpleList simpleList) {
+        this.simpleList = simpleList;
+        this.index = 0;
+    }
+
+    @Override
+    public boolean hasNext() {
+        return index < simpleList.size;
+    }
+
+    @Override
+    public Integer next() {
+        return simpleList.items[index++];
+    }
+}
+
+// Iterable
+public interface Iterable<T> {
+    Iterator<T> iterator();
+}
+
+public class SimpleList implements Iterable<Integer> {
+    private Integer[] items;
+    private int size = 0;
+
+    public SimpleList(int capacity) {
+        items = new Integer[capacity];
+    }
+
+    public void add(Integer item) {
+        if (size < items.length) {
+            items[size] = item;
+            size++;
+        }
+    }
+
+    @Override
+    public Iterator<Integer> iterator() {
+        return new SimpleListIterator(this);
+    }
+}
+```
+## Memento
+Allow an object to save its internal state without exposing its internal structure, it does this by delegating the creation of state snapshots to the object itself.
+
+No object other than the originator can access the state of the memento.
+
+Useful for implementing undo/redo functionality
+
+Components
+- Originator: produces snapshots of its own state, can use memento to restore its state
+- Memento: snapshot originator's state, is immutable
+- Caretaker: keeps track of mementos, can restore the originator's state (should not access memento state)
+
+```java
+// Originator
+public class TextEditor {
+    private StringBuilder currentText;
+
+    public TextEditor() {
+        this.currentText = new StringBuilder();
+    }
+
+    public void addText(String text) {
+        currentText.append(text);
+    }
+
+    public String getText() {
+        return currentText.toString();
+    }
+
+    // Saves the current state inside a memento
+    public TextMemento save() {
+        return new TextMemento(new StringBuilder(currentText));
+    }
+    // Restores the state from the memento
+    public void restore(TextMemento memento) {
+        currentText = new StringBuilder(memento.state);
+    }
+
+    // The inner Memento class
+    public static class TextMemento {
+        private final StringBuilder state;
+        private TextMemento(StringBuilder state) {
+            this.state = new StringBuilder(state);
+        }
+        private StringBuilder getState() {
+            return new StringBuilder(state);
+        }
+    }
+}
+
+// Caretaker
+public class Caretaker {
+    private Stack<TextEditor.TextMemento> history = new Stack<>();
+    public void save(TextEditor editor) {
+        history.push(editor.save());
+    }
+    public void undo(TextEditor editor) {
+        if (!history.isEmpty()) {
+            editor.restore(history.pop());
+        }
+    }
+}
+```
+
+Memento pattern can be integrated with command pattern.
+- Receiver (from command pattern) and originator (from memento pattern) are merged
+- Command object
+    - Creates memento in the command execution method
+    - Stores the memento
+    - In its undo method, uses the memento to restore the state of the originator (need to have keep a reference of the originator)
+- Invoker(from command pattern) and caretaker (from memento pattern) are merged
+    - Invokes the command
+    - Keep track of commands
+
+```Java
+
+// Receiver and Originator
+class TextEditor { 
+    private StringBuilder text = new StringBuilder();
+
+    public void append(String newText) {
+        text.append(newText);
+    }
+
+    // Memento-related methods
+    public Memento save() {
+        return new Memento(text.toString());
+    }
+
+    public void restore(Memento memento) {
+        text = new StringBuilder(memento.getState());
+    }
+
+    static class Memento {
+        private final String textState;
+
+        public Memento(String state) {
+            this.textState = state;
+        }
+
+        private String getState() {
+            return textState;
+        }
+    }
+}
+
+// Command 
+interface Command {
+    void execute();
+    void undo();
+}
+class AppendCommand implements Command {
+    private TextEditor editor;
+    private String textToAdd;
+    private TextEditor.Memento prevState;
+
+    public AppendCommand(TextEditor editor, String textToAdd) {
+        this.editor = editor;
+        this.textToAdd = textToAdd;
+    }
+
+    @Override
+    public void execute() {
+        prevState = editor.save(); // Save state before execution
+        editor.append(textToAdd);
+    }
+
+    @Override
+    public void undo() {
+        editor.restore(prevState); // Restore to previous state
+    }
+}
+
+// Invoker and Caretaker
+class CommandManager { 
+    private Stack<Command> commands = new Stack<>();
+    // Methods to execute, undo, and manage commands
+}
+```
+
+## Observer
+Publisher notifies multiple subscriber about an event.
+
+Components
+- Subscriber interface: has methods that publishers will call (can have parameters such as event data, event type)
+- Concrete Subscriber: perform actions in response to events
+- Publisher: notifies events to subscribers, keeps track of subscribers
+
+```java
+// Subscriber
+public interface NotificationObserver {
+    void update(String message);
+}
+
+public class EmailNotification implements NotificationObserver {
+    private String email;
+    public EmailNotification(String email) {
+        this.email = email;
+    }
+    @Override
+    public void update(String message) {
+        System.out.println("Email to " + email + ": " + message);
+    }
+}
+
+// Publisher
+public interface NotificationService {
+    void addObserver(NotificationObserver observer);
+    void removeObserver(NotificationObserver observer);
+    void notifyObservers(String message);
+}
+
+public class NotificationManager implements NotificationService {
+    private List<NotificationObserver> observers = new ArrayList<>();
+    @Override
+    public void addObserver(NotificationObserver observer) {
+        observers.add(observer);
+    }
+    @Override
+    public void removeObserver(NotificationObserver observer) {
+        observers.remove(observer);
+    }
+    @Override
+    public void notifyObservers(String message) {
+        for (NotificationObserver observer : observers) {
+            observer.update(message);
+        }
+    }
+}
+```
+
+## State
+Used when an object’s behaviour depends on its internal state.
+
+Models a FSM (Finite state machine)
+
+Components
+- Context: Contains a single concrete state
+- State interface: encapsulates all possible behaviours of the state (should make sense for all states, avoid useless methods)
+- Concrete state: implement behaviour
+
+Example uses: game characters, UI control states
+
+```java
+// State
+public interface TrafficLightState {
+    void change(TrafficLight trafficLight);
+}
+
+class GreenLightState implements TrafficLightState {
+    public void change(TrafficLight trafficLight) {
+        System.out.println("Green light. Go!");
+        trafficLight.setState(new YellowLightState());
+    }
+}
+
+class YellowLightState implements TrafficLightState {
+    public void change(TrafficLight trafficLight) {
+        System.out.println("Yellow light. Prepare to stop.");
+        trafficLight.setState(new RedLightState());
+    }
+}
+
+class RedLightState implements TrafficLightState {
+    public void change(TrafficLight trafficLight) {
+        System.out.println("Red light. Stop.");
+        trafficLight.setState(new GreenLightState());
+    }
+}
+
+// Context
+public class TrafficLight {
+    private TrafficLightState state;
+    public TrafficLight(TrafficLightState state) {
+        this.state = state;
+    }
+    public void change() {
+        state.change(this);
+    }
+    public void setState(TrafficLightState state) {
+        this.state = state;
+    }
+}
+
+public class StatePatternDemo {
+    public static void main(String[] args) {
+        TrafficLight trafficLight = new TrafficLight(new GreenLightState());
+
+        // Simulate traffic light changes
+        trafficLight.change(); // Green light. Go!
+        trafficLight.change(); // Yellow light. Prepare to stop.
+        trafficLight.change(); // Red light. Stop.
+    }
+}
+```
+
+## Strategy
+Define a family of algorithm, encapsulate each one, and make them interchangeable.
+
+Decouples the implementation details of an algorithm from the code that uses it.
+
+Components
+- Strategy: Interface for the algorithm
+- Concrete strategy: Implements the algorithm
+- Context: Uses the strategy
+
+```java
+// Strategy
+public interface PaymentStrategy {
+    boolean validatePaymentDetails();
+    void pay(int amount);
+}
+
+public class CreditCardPayment implements PaymentStrategy {
+    private String name;
+    private String cardNumber;
+    public CreditCardPayment(String name, String cardNumber) {
+        this.name = name;
+        this.cardNumber = cardNumber;
+    }
+    @Override
+    public void collectPaymentDetails() {
+        System.out.println("Collecting credit/debit card details.");
+    }
+
+    @Override
+    public boolean validatePaymentDetails(){
+        return cardNumber.length() == 16;
+    }
+
+    @Override
+    public void pay(int amount) {
+        System.out.println(amount + " paid with credit/debit card.");
+    }
+}
+
+public class PayPalPayment implements PaymentStrategy {
+    private String emailId;
+    public PayPalPayment(String emailId) {
+        this.emailId = emailId;
+    }
+    @Override
+    public void pay(int amount) {
+        System.out.println(amount + " paid using PayPal.");
+    }
+}
+
+// Context
+public class ShoppingCart {
+    private PaymentStrategy paymentStrategy;
+    // Set the payment strategy
+    public void setPaymentStrategy(PaymentStrategy paymentStrategy) {
+        this.paymentStrategy = paymentStrategy;
+    }
+    public void checkout() {
+        int amount = calculateTotal();
+        if(paymentStrategy.validatePaymentDetails()) {
+            paymentStrategy.pay(amount); 
+        }
+    }
+}
+
+public class StrategyPatternDemo {
+    public static void main(String[] args) {
+        ShoppingCart cart = new ShoppingCart();
+
+        // Paying with PayPal
+        cart.setPaymentStrategy(new PayPalPayment("myemail@example.com"));
+        cart.checkout();
+
+        // Switching to Credit Card Payment
+        cart.setPaymentStrategy(new CreditCardPayment("John Doe", "1234567890"));
+        cart.checkout();
+    }
+}
+```
+## Template method
+Defines skeleton of algorithm in the superclass and lets subclasses override specific steps of the algorithm without changing its structure.
+
+Eg. Useful for Workflow processes, UI rendering process...
+
+```java
+// Template 
+public abstract class ReportGenerator {
+
+    // Template method
+    public final void generateReport() {
+        collectData();
+        analyzeData();
+        formatReport();
+        printReport();
+    }
+
+    // Steps defined as abstract methods
+    protected abstract void collectData();
+    protected abstract void analyzeData();
+
+    // Steps with default implementations
+    protected void formatReport() {
+        System.out.println("Formatting report in default format.");
+    }
+
+    protected void printReport() {
+        System.out.println("Printing report to standard output.");
+    }
+}
+
+public class SalesReport extends ReportGenerator {
+    @Override
+    protected void collectData() {
+        System.out.println("Collecting sales data.");
+    }
+
+    @Override
+    protected void analyzeData() {
+        System.out.println("Analyzing sales data.");
+    }
+}
+
+public class InventoryReport extends ReportGenerator {
+    @Override
+    protected void collectData() {
+        System.out.println("Collecting inventory data.");
+    }
+
+    @Override
+    protected void analyzeData() {
+        System.out.println("Analyzing inventory data.");
+    }
+
+    @Override
+    protected void formatReport() {
+        System.out.println("Formatting inventory report specifically.");
+    }
+}
+
+public class TemplateMethodDemo {
+    public static void main(String[] args) {
+        ReportGenerator salesReport = new SalesReport();
+        salesReport.generateReport(); // Generates a sales report
+        ReportGenerator inventoryReport = new InventoryReport();
+        inventoryReport.generateReport(); // Generates an inventory report with specific formatting
+    }
+}
+```
+
+## Visitor pattern
+Separates algorithms or behaviours from the object structure on which they operate. It isolates particular behaviours from the objects on which they operate, and places them in a single class
+
+Uses double dispatch to delegate the choosing of the proper method to the object itself (Dispatch is the method selection process used at runtime to decide which implementation of a method should be called)
+    - The first dispatch is the object itself, which calls the visitor's method.
+    - The second dispatch is the visitor, which calls a visit method specific to the element's class
+
+```java
+// Shape.java
+public interface Shape {
+    void accept(ShapeVisitor visitor);
+}
+
+// Circle.java
+public class Circle implements Shape {
+    public double radius;
+    public Circle(double radius) {
+        this.radius = radius;
+    }
+    @Override
+    public void accept(ShapeVisitor visitor) {
+        visitor.visit(this);
+    }
+}
+
+// Rectangle.java
+public class Rectangle implements Shape {
+    public double width;
+    public double height;
+
+    public Rectangle(double width, double height) {
+        this.width = width;
+        this.height = height;
+    }
+    @Override
+    public void accept(ShapeVisitor visitor) {
+        visitor.visit(this);
+    }
+}
+
+// ShapeVisitor.java
+public interface ShapeVisitor {
+    void visit(Circle circle);
+    void visit(Rectangle rectangle);
+}
+
+// AreaCalculator.java
+public class AreaCalculator implements ShapeVisitor {
+    public void calculateAllShapeAreas(Shape... shapes){
+        for(Shape shape: shapes){
+            shape.accept(this);
+        }
+    }
+
+    @Override
+    public void visit(Circle circle) {
+        double area = Math.PI * circle.radius * circle.radius;
+        System.out.println("Area of Circle: " + area);
+    }
+    @Override
+    public void visit(Rectangle rectangle) {
+        double area = rectangle.width * rectangle.height;
+        System.out.println("Area of Rectangle: " + area);
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        Shape circle = new Circle(5);
+        Shape rectangle = new Rectangle(10, 20);
+        AreaCalculator areaCalculator = new AreaCalculator();
+        calculateAllShapeAreas(circle, rectangle)
+    }
+}
+
+```
